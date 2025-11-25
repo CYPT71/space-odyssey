@@ -24,9 +24,13 @@ const createPlanetMesh = (data) => {
 // Generate non-overlapping planet positions using simple rejection sampling
 function generatePlanetPositions(count, baseRadius, heightRange, minSeparation) {
     const positions = [];
-    const maxTries = 64;
+    const maxTries = 128; // Increased attempts for better placement
+
     for (let i = 0; i < count; i++) {
         let placed = false;
+        let bestPos = null;
+        let bestMinDist = 0;
+
         for (let t = 0; t < maxTries && !placed; t++) {
             const angle = Math.random() * Math.PI * 2;
             const radius = baseRadius * (1.0 + (Math.random() - 0.5) * 0.4) + Math.random() * 60000;
@@ -36,15 +40,38 @@ function generatePlanetPositions(count, baseRadius, heightRange, minSeparation) 
                 height,
                 Math.sin(angle) * radius + (Math.random() - 0.5) * 50000
             );
-            let ok = true;
+
+            // Find minimum distance to existing planets
+            let minDist = Infinity;
             for (let j = 0; j < positions.length; j++) {
-                if (pos.distanceTo(positions[j]) < minSeparation) { ok = false; break; }
+                const dist = pos.distanceTo(positions[j]);
+                if (dist < minDist) minDist = dist;
             }
-            if (ok) { positions.push(pos); placed = true; }
+
+            // If no existing planets, or distance is acceptable
+            if (positions.length === 0 || minDist >= minSeparation) {
+                positions.push(pos);
+                placed = true;
+            } else if (minDist > bestMinDist) {
+                // Track best attempt for fallback
+                bestMinDist = minDist;
+                bestPos = pos;
+            }
         }
-        if (!placed) {
-            // fallback: push with slight offset
-            positions.push(new THREE.Vector3((Math.random()-0.5)*baseRadius, (Math.random()-0.5)*heightRange, (Math.random()-0.5)*baseRadius));
+
+        if (!placed && bestPos) {
+            // Use best attempt (maximizes distance even if below minSeparation)
+            console.warn(`Planet ${i}: Could not maintain ${minSeparation / 1000}km separation, using ${Math.round(bestMinDist / 1000)}km`);
+            positions.push(bestPos);
+        } else if (!placed) {
+            // Last resort: place far from center
+            const fallbackAngle = (i / count) * Math.PI * 2;
+            const fallbackRadius = baseRadius * 1.5;
+            positions.push(new THREE.Vector3(
+                Math.cos(fallbackAngle) * fallbackRadius,
+                (Math.random() - 0.5) * heightRange,
+                Math.sin(fallbackAngle) * fallbackRadius
+            ));
         }
     }
     return positions;
@@ -69,10 +96,10 @@ export const createGalaxy = (galaxyData, position = { x: 0, y: 0, z: 0 }) => {
     const core = createGalaxyCore(color, 18000);
     group.add(core);
 
-    // Planets in orbit (randomized 3D positions) - ULTRA MASSIVE
-    const baseRadius = 900000; // larger orbit radius for more space
-    const heightRange = 260000; // +/- height range
-    const minSep = 90000; // minimal distance between planet centers
+    // Planets in orbit (randomized 3D positions) - MASSIVE GALAXIES
+    const baseRadius = 4000000; // 4 billion units - huge galaxy scale
+    const heightRange = 800000; // +/- 800M height variation
+    const minSep = 60000; // 60 km minimum separation (reduced for closer planets)
     const positions = generatePlanetPositions(galaxyData.files.length, baseRadius, heightRange, minSep);
     galaxyData.files.forEach((file, i) => {
         const pos = positions[i];

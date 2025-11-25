@@ -31,11 +31,11 @@ export function createInputSystem(systems) {
         const modal = document.createElement('div');
         modal.style.cssText = [
             'position:fixed',
-            'top:50%','left:50%','transform:translate(-50%,-50%)',
+            'top:50%', 'left:50%', 'transform:translate(-50%,-50%)',
             'background:rgba(0,20,40,0.95)',
             'border:2px solid #00F0FF',
-            'padding:20px','min-width:320px',
-            'color:#00F0FF','font-family:monospace','text-align:center',
+            'padding:20px', 'min-width:320px',
+            'color:#00F0FF', 'font-family:monospace', 'text-align:center',
             'box-shadow:0 0 20px rgba(0,240,255,0.5)',
             'z-index:9999'
         ].join(';');
@@ -135,7 +135,7 @@ export function createInputSystem(systems) {
                     }
                 } catch (_) { /* ignore URL errors */ }
 
-                // Blog post links: open in terminal (no teleport)
+                // Posts post links: open in terminal (no teleport)
                 if (href.startsWith('/posts/') || href.includes('/posts/')) {
                     e.preventDefault();
                     openUrlInTerminal(href);
@@ -223,7 +223,7 @@ export function createInputSystem(systems) {
             // Handle gas cloud teleportation (like planet): move near cloud center
             if (target.userData?.isGasCloud) {
                 if (!target.geometry?.boundingSphere) {
-                    try { target.geometry && target.geometry.computeBoundingSphere(); } catch (e) {}
+                    try { target.geometry && target.geometry.computeBoundingSphere(); } catch (e) { }
                 }
                 const size = target.geometry?.boundingSphere?.radius || 80000;
                 const offset = new THREE.Vector3(0, 0, size + 20000);

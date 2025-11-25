@@ -38,14 +38,21 @@ export function createPhysicsSystem(systems) {
 
         // Get current speed and warp factor
         const currentSpeed = shipControls.getSpeed();
-        const warpFactor = shipControls.getWarpFactor();
+        let warpFactor = shipControls.getWarpFactor();
+        const isWarp20 = shipControls.isWarp20Active();
+
+        // Validate warp factor to prevent audio errors
+        if (!isFinite(warpFactor)) {
+            console.warn('Invalid warp factor detected:', warpFactor);
+            warpFactor = 0;
+        }
 
         // Update camera (handle reverse mode AND shake)
         const speedRatio = Math.min(Math.abs(currentSpeed) / 125000, 1);
         cameraController.update(currentSpeed < 0, speedRatio);
 
-        // Update particles with current speed for warp effects
-        particleSystem.update(currentSpeed);
+        // Update particles with current speed and Warp 20 state for deformation effects
+        particleSystem.update(currentSpeed, isWarp20);
 
         // Update Navigation HUD
         navigationHUD.update(shipGroup.position);
@@ -60,7 +67,7 @@ export function createPhysicsSystem(systems) {
         const allPlanets = galaxyManager.getAllObjects();
         shipControls.applyGravity(allPlanets);
 
-        // Update audio
+        // Update audio (with validated warp factor)
         audioSystem.updateEngineSound(warpFactor);
         audioSystem.updateWarpSound(warpFactor);
 
@@ -84,9 +91,9 @@ export function createPhysicsSystem(systems) {
             const type = closestObject.type || getObjectType(closestObject.obj?.userData);
             const prefixed = type === 'planet' ? `🌍 ${rawName}`
                 : type === 'galaxy' ? `🌌 ${rawName}`
-                : type === 'gasCloud' ? `🌫️ ${rawName}`
-                : type === 'nebula' ? `✨ ${rawName}`
-                : rawName;
+                    : type === 'gasCloud' ? `🌫️ ${rawName}`
+                        : type === 'nebula' ? `✨ ${rawName}`
+                            : rawName;
             uiManager.hudTarget.textContent = `TARGET: ${prefixed}`;
         } else {
             uiManager.hudTarget.textContent = 'TARGET: NONE';

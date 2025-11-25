@@ -10,6 +10,12 @@ import { getObjectName, getObjectType, getIconForType } from './space-object-uti
 const scratchVector = new THREE.Vector3();
 const scratchVector2 = new THREE.Vector3();
 
+// Helper: Format distance to km
+const formatDistance = (d) => {
+    const km = Math.round(d / 1000);
+    return `${km.toLocaleString()} km`;
+};
+
 /**
  * Updates the minimap display
  * @param {THREE.Object3D} shipGroup - Ship object
@@ -38,18 +44,21 @@ export function updateMinimap(shipGroup, galaxyManager, frameCount) {
     }
 
     const isExpanded = document.getElementById('hud-minimap').classList.contains('expanded');
+
     // Collapsible state with persistence
     const loadState = () => {
         try { const raw = localStorage.getItem('minimapState'); return raw ? JSON.parse(raw) : null; } catch { return null; }
     };
-    const saveState = (st) => { try { localStorage.setItem('minimapState', JSON.stringify(st)); } catch {} };
+    const saveState = (st) => { try { localStorage.setItem('minimapState', JSON.stringify(st)); } catch { } };
     window.minimapState = window.minimapState || loadState() || { galaxiesCollapsed: false, gasCollapsed: false, galaxyCollapse: {}, cloudCollapse: {} };
     window.minimapState.galaxyCollapse = window.minimapState.galaxyCollapse || {};
     window.minimapState.cloudCollapse = window.minimapState.cloudCollapse || {};
+
     window.toggleMinimap = (section) => {
         const key = section === 'galaxies' ? 'galaxiesCollapsed' : 'gasCollapsed';
         window.minimapState[key] = !window.minimapState[key];
         saveState(window.minimapState);
+        // Force immediate update? Or wait for next frame.
     };
     window.toggleGalaxy = (uuid) => {
         const map = window.minimapState.galaxyCollapse;
@@ -61,11 +70,11 @@ export function updateMinimap(shipGroup, galaxyManager, frameCount) {
         map[uuid] = !map[uuid];
         saveState(window.minimapState);
     };
+
     const allObjects = galaxyManager.getAllObjects();
-    const quantize = (d) => Math.round(d / 1000) * 1000;
     const shipPos = shipGroup.position;
 
-    // Categorize non-galaxy objects here; galaxies handled separately to nest planets
+    // Categorize
     const categories = {
         rootPlanets: [],
         gasClouds: [],
@@ -76,15 +85,13 @@ export function updateMinimap(shipGroup, galaxyManager, frameCount) {
         const obj = allObjects[i];
         const userData = obj.userData || {};
 
-        // Skip if no relevant data
         if (!userData.planetData && !userData.galaxyData && !userData.cloudData && !userData.isNebula && !userData.isGasCloud) continue;
 
         obj.getWorldPosition(scratchVector);
-        const dist = Math.round(shipPos.distanceTo(scratchVector) / 1000) * 1000;
+        const dist = shipPos.distanceTo(scratchVector);
 
         if (!isFinite(dist) || dist < 0) continue;
 
-        // Build name via utils (adds icon for non-planet types)
         let preferredName = getObjectName(obj);
         const typ = getObjectType(userData);
         const icon = getIconForType(typ);
@@ -96,7 +103,6 @@ export function updateMinimap(shipGroup, galaxyManager, frameCount) {
             name: preferredName
         };
 
-        // Helper: detect if object is inside a galaxy group (has an ancestor with isGalaxy)
         const isInsideGalaxy = (node) => {
             let p = node.parent;
             while (p) {
@@ -106,82 +112,227 @@ export function updateMinimap(shipGroup, galaxyManager, frameCount) {
             return false;
         };
 
-        // Categorize (skip planets inside galaxies here; handled in nested section)
         if (userData.isNebula) {
             categories.nebulae.push(item);
         } else if (userData.isGasCloud || userData.cloudData) {
             categories.gasClouds.push(item);
         } else if (userData.planetData && !isInsideGalaxy(obj)) {
-            // Root planets (not under a galaxy group)
             categories.rootPlanets.push(item);
         }
     }
 
-    // Sort each category by distance
+    // Sort
     Object.values(categories).forEach(cat => cat.sort((a, b) => a.distance - b.distance));
 
     const limit = isExpanded ? 100 : 8;
-    let html = '';
 
-    // Helper to create category section
-    const createCategory = (title, items, icon, color) => {
-        if (items.length === 0) return '';
+    // --- DOM Sync Helpers ---
 
-        const itemsToShow = items.slice(0, limit);
-        let categoryHtml = `<div class="minimap-category" style="border-left: 3px solid ${color}; padding-left: 8px; margin: 8px 0;">`;
-        categoryHtml += `<div style="font-weight: bold; color: ${color}; margin-bottom: 4px;">${icon} ${title}</div>`;
+    const syncCategory = (idSuffix, title, color, items, isCollapsed, toggleKey) => {
+        const catId = `minimap-cat-${idSuffix}`;
+        let catDiv = document.getElementById(catId);
 
-        itemsToShow.forEach((item, i) => {
-            const dist = Math.floor(item.distance);
-            const isClosest = i === 0;
-            categoryHtml += `<div class="minimap-item ${isClosest ? 'closest' : ''}" onclick="window.teleportTo('${item.obj.uuid}')" style="cursor: pointer; padding-left: 12px;">
-                ${item.name} - ${dist}m
-            </div>`;
-        });
+        // Hide if empty
+        if (items.length === 0) {
+            if (catDiv) catDiv.style.display = 'none';
+            return;
+        }
 
-        categoryHtml += '</div>';
-        return categoryHtml;
+        if (!catDiv) {
+            catDiv = document.createElement('div');
+            catDiv.id = catId;
+            catDiv.className = 'minimap-category';
+            catDiv.style.borderLeft = `3px solid ${color}`;
+            catDiv.style.paddingLeft = '8px';
+            catDiv.style.margin = '8px 0';
+
+            const header = document.createElement('div');
+            header.className = 'category-header';
+            header.style.fontWeight = 'bold';
+            header.style.color = color;
+            header.style.marginBottom = '4px';
+            if (toggleKey) {
+                header.style.cursor = 'pointer';
+                header.onclick = () => window.toggleMinimap(toggleKey);
+            }
+            catDiv.appendChild(header);
+
+            const itemsContainer = document.createElement('div');
+            itemsContainer.className = 'items-container';
+            catDiv.appendChild(itemsContainer);
+
+            minimapList.appendChild(catDiv);
+        } else {
+            catDiv.style.display = 'block';
+            // Ensure order in main list? (Galaxies, Planets, Clouds, Nebulae)
+            // We'll rely on the call order.
+        }
+
+        // Update Header
+        const header = catDiv.querySelector('.category-header');
+        if (toggleKey) {
+            const symbol = isCollapsed ? '▸' : '▾';
+            header.textContent = `${symbol} ${title}`;
+        } else {
+            header.textContent = title;
+        }
+
+        // Sync Items
+        const itemsContainer = catDiv.querySelector('.items-container');
+        if (isCollapsed && toggleKey) {
+            itemsContainer.style.display = 'none';
+        } else {
+            itemsContainer.style.display = 'block';
+            syncItems(itemsContainer, items, limit);
+        }
     };
 
-    // Build nested Galaxies section with recursive sub-galaxies and planets
+    const syncItems = (container, items, maxItems) => {
+        const itemsToShow = items.slice(0, maxItems);
+        const currentIds = new Set();
+
+        itemsToShow.forEach((item, i) => {
+            const itemId = `minimap-item-${item.uuid}`;
+            currentIds.add(itemId);
+
+            let el = document.getElementById(itemId);
+            if (!el) {
+                el = document.createElement('div');
+                el.id = itemId;
+                el.className = 'minimap-item';
+                el.style.cursor = 'pointer';
+                // Base styles
+                el.onclick = item.onClick || (() => window.teleportTo(item.uuid));
+            }
+
+            // Update content
+            // We use a data attribute to check if we need to update structure (e.g. icon changed? unlikely)
+            // But distance changes every frame.
+
+            // Apply styles
+            if (item.style) {
+                Object.assign(el.style, item.style);
+            }
+            if (item.className) {
+                el.className = `minimap-item ${item.className}`;
+            }
+            if (i === 0) el.classList.add('closest');
+            else el.classList.remove('closest');
+
+            // Update text content
+            // We construct the innerHTML but try to be efficient? 
+            // Actually, for "update only text nodes", we should have spans.
+            // But the structure varies (indentation, carets).
+            // Let's use innerHTML but only if it changed? No, that's what we wanted to avoid.
+            // Let's use a standard structure: [Indent][Caret][Icon][Name] - [Distance]
+
+            // Check if structure exists
+            let indentSpan = el.querySelector('.mm-indent');
+            let caretSpan = el.querySelector('.mm-caret');
+            let contentSpan = el.querySelector('.mm-content');
+
+            if (!contentSpan) {
+                el.innerHTML = ''; // Reset
+                el.style.display = 'flex';
+                el.style.alignItems = 'center';
+                el.style.gap = '6px';
+
+                indentSpan = document.createElement('span');
+                indentSpan.className = 'mm-indent';
+                el.appendChild(indentSpan);
+
+                caretSpan = document.createElement('span');
+                caretSpan.className = 'mm-caret';
+                caretSpan.style.cursor = 'pointer';
+                el.appendChild(caretSpan);
+
+                contentSpan = document.createElement('span');
+                contentSpan.className = 'mm-content';
+                contentSpan.style.flex = '1';
+                el.appendChild(contentSpan);
+            }
+
+            // Update Indent
+            indentSpan.style.width = `${item.indent || 0}px`;
+
+            // Update Caret
+            if (item.hasCaret) {
+                caretSpan.textContent = item.caretSymbol;
+                caretSpan.onclick = (e) => {
+                    e.stopPropagation();
+                    item.onCaretClick();
+                };
+                caretSpan.style.display = 'inline';
+            } else {
+                caretSpan.style.display = 'none';
+            }
+
+            // Update Content (Name - Distance)
+            const distStr = formatDistance(item.distance);
+            const text = `${item.icon ? item.icon + ' ' : ''}${item.name} - ${distStr}`;
+
+            // Only update if changed
+            if (contentSpan.textContent !== text) {
+                contentSpan.textContent = text;
+            }
+
+            // Ensure order
+            if (container.children[i] !== el) {
+                container.appendChild(el);
+            }
+        });
+
+        // Cleanup
+        Array.from(container.children).forEach(child => {
+            if (!currentIds.has(child.id)) {
+                container.removeChild(child);
+            }
+        });
+    };
+
+    // --- Prepare Lists ---
+
+    // 1. Galaxies (Recursive)
+    const galaxyRows = [];
     const galaxies = galaxyManager.getGalaxies();
+
     if (galaxies && galaxies.length) {
-        let galaxySection = `<div class="minimap-category" style="border-left: 3px solid #FF00FF; padding-left: 8px; margin: 8px 0;">`;
-        const gCollapsed = !!window.minimapState.galaxiesCollapsed;
-        const gSymbol = gCollapsed ? '▸' : '▾';
-        galaxySection += `<div style="font-weight: bold; color: #FF00FF; margin-bottom: 4px; cursor:pointer;" onclick="window.toggleMinimap('galaxies')">${gSymbol} 🌌 Galaxies</div>`;
-
-        const renderGalaxy = (group, level = 0) => {
+        const processGalaxy = (group, level) => {
             group.getWorldPosition(scratchVector);
-            const gDist = Math.round(shipPos.distanceTo(scratchVector) / 1000) * 1000;
+            const gDist = shipPos.distanceTo(scratchVector);
             const galaxyName = group.userData?.galaxyData?.name || 'Galaxy';
-            const pad = 6 + level * 12;
             const collapsed = !!window.minimapState.galaxyCollapse[group.uuid];
-            const caret = collapsed ? '▸' : '▾';
-            galaxySection += `<div class="minimap-item" style="color:#FF99FF; margin:6px 0; padding-left:${pad}px; display:flex; gap:6px; align-items:center;">
-                <span style=\"cursor:pointer;color:#FF99FF;\" onclick=\"window.toggleGalaxy('${group.uuid}')\">${caret}</span>
-                <span style=\"flex:1;cursor:pointer;\" onclick=\"window.teleportTo('${group.uuid}')\">${galaxyName} - ${Math.floor(gDist)}m</span>
-            </div>`;
 
-            if (window.minimapState.galaxiesCollapsed || collapsed) return; // collapsed: skip details
+            galaxyRows.push({
+                uuid: group.uuid,
+                name: galaxyName,
+                distance: gDist,
+                indent: 6 + level * 12,
+                hasCaret: true,
+                caretSymbol: collapsed ? '▸' : '▾',
+                onCaretClick: () => window.toggleGalaxy(group.uuid),
+                style: { color: '#FF99FF' }
+            });
 
-            // Direct planets of this group
+            if (window.minimapState.galaxiesCollapsed || collapsed) return;
+
+            // Planets
             const directPlanets = group.children.filter(c => c.userData && c.userData.planetData);
             const planetItems = directPlanets.map(p => {
                 p.getWorldPosition(scratchVector2);
                 return {
-                    obj: p,
+                    uuid: p.uuid,
                     name: p.userData.planetData.title || p.userData.planetData.name || 'Planet',
-                    distance: Math.round(shipPos.distanceTo(scratchVector2) / 1000) * 1000
+                    distance: shipPos.distanceTo(scratchVector2),
+                    indent: 6 + level * 12 + 18,
+                    icon: '🌍',
+                    style: { color: '#00F0FF' }
                 };
-            }).sort((a,b) => a.distance - b.distance).slice(0, limit);
+            }).sort((a, b) => a.distance - b.distance).slice(0, limit);
 
-            planetItems.forEach((p, i) => {
-                const isClosest = i === 0;
-                galaxySection += `<div class="minimap-item ${isClosest ? 'closest' : ''}" onclick="window.teleportTo('${p.obj.uuid}')" style="cursor:pointer; padding-left:${pad + 18}px; color:#00F0FF;">🌍 ${p.name} - ${Math.floor(p.distance)}m</div>`;
-            });
+            galaxyRows.push(...planetItems);
 
-            // Recurse into immediate sub-galaxies (handles wrapped sub-groups)
+            // Sub-galaxies
             const isImmediateSubGalaxy = (node, parent) => {
                 let p = node.parent;
                 while (p && p !== parent && !p.userData?.isGalaxy && p.userData?.objectType !== 'galaxy') {
@@ -189,49 +340,60 @@ export function updateMinimap(shipGroup, galaxyManager, frameCount) {
                 }
                 return p === parent;
             };
+
             group.traverse(child => {
                 if (child === group) return;
                 const ud = child.userData || {};
                 if ((ud.isGalaxy || ud.objectType === 'galaxy') && isImmediateSubGalaxy(child, group)) {
-                    renderGalaxy(child, level + 1);
+                    processGalaxy(child, level + 1);
                 }
             });
         };
 
-        galaxies.forEach(g => renderGalaxy(g.group || g, 0));
-
-        galaxySection += `</div>`;
-        html += galaxySection;
+        galaxies.forEach(g => processGalaxy(g.group || g, 0));
     }
 
-    // Root planets (standalone)
-    html += createCategory('Planets', categories.rootPlanets, '🌍', '#00F0FF');
+    syncCategory('galaxies', '🌌 Galaxies', '#FF00FF', galaxyRows, !!window.minimapState.galaxiesCollapsed, 'galaxies');
 
-    // Build nested Gas Clouds section with Nebulae as submenu
+    // 2. Root Planets
+    const rootPlanetRows = categories.rootPlanets.map(p => ({
+        uuid: p.obj.uuid,
+        name: p.name.replace('🌍 ', ''), // Remove icon if added by getObjectName
+        distance: p.distance,
+        icon: '🌍',
+        style: { paddingLeft: '12px' }
+    }));
+    syncCategory('planets', 'Planets', '#00F0FF', rootPlanetRows);
+
+    // 3. Gas Clouds
+    const cloudRows = [];
     const gasClouds = galaxyManager.getGasClouds ? galaxyManager.getGasClouds() : [];
-    if (gasClouds && gasClouds.length) {
-        let cloudSection = `<div class=\"minimap-category\" style=\"border-left: 3px solid #00FF88; padding-left: 8px; margin: 8px 0;\">`;
-        const cCollapsed = !!window.minimapState.gasCollapsed;
-        const cSymbol = cCollapsed ? '▸' : '▾';
-        cloudSection += `<div style=\"font-weight: bold; color: #00FF88; margin-bottom: 4px; cursor:pointer;\" onclick=\"window.toggleMinimap('gas')\">${cSymbol} 🌫️ Gas Clouds</div>`;
 
-        const renderNebula = (nebula, level) => {
-            const pad = 18 + level * 12;
+    if (gasClouds && gasClouds.length) {
+        const processNebula = (nebula, level) => {
             nebula.getWorldPosition(scratchVector2);
-            const nDist = Math.round(shipPos.distanceTo(scratchVector2) / 1000) * 1000;
+            const nDist = shipPos.distanceTo(scratchVector2);
             const postsCount = Array.isArray(nebula.userData?.posts) ? nebula.userData.posts.length : 0;
             const name = (nebula.userData?.tagName || 'Nebula') + (postsCount ? ` (${postsCount})` : '');
-            const marker = level > 0 ? '↳ ' : '';
-            cloudSection += `<div class=\"minimap-item\" onclick=\"window.teleportTo('${nebula.uuid}')\" style=\"cursor:pointer; padding-left:${pad}px; color:#FF88FF;\">${marker}✨ ${name} - ${Math.floor(nDist)}m</div>`;
+
+            cloudRows.push({
+                uuid: nebula.uuid,
+                name: name,
+                distance: nDist,
+                indent: 18 + level * 12,
+                icon: level > 0 ? '↳ ✨' : '✨',
+                style: { color: '#FF88FF' }
+            });
+
             nebula.traverse(child => {
                 if (child === nebula) return;
-                if (child.userData?.isNebula && (function isImmediate(node, parent){ let p=node.parent; while(p&&p!==parent&&!p.userData?.isNebula){p=p.parent;} return p===parent; })(child, nebula)) {
-                    renderNebula(child, level + 1);
+                if (child.userData?.isNebula && (function isImmediate(node, parent) { let p = node.parent; while (p && p !== parent && !p.userData?.isNebula) { p = p.parent; } return p === parent; })(child, nebula)) {
+                    processNebula(child, level + 1);
                 }
             });
         };
 
-        gasClouds.forEach((cloud) => {
+        gasClouds.forEach(cloud => {
             const cloudData = cloud.userData?.cloudData || {};
             const postsCount = (cloudData.posts ? cloudData.posts.length : 0) +
                 Object.values(cloudData.nebulae || {}).reduce((a, n) => a + (n.posts ? n.posts.length : 0), 0);
@@ -239,38 +401,44 @@ export function updateMinimap(shipGroup, galaxyManager, frameCount) {
             const displayName = postsCount ? `${nameBase} (${postsCount})` : nameBase;
 
             cloud.getWorldPosition(scratchVector);
-            const cDist = Math.round(shipPos.distanceTo(scratchVector) / 1000) * 1000;
-
+            const cDist = shipPos.distanceTo(scratchVector);
             const collapsed = !!(window.minimapState.cloudCollapse && window.minimapState.cloudCollapse[cloud.uuid]);
-            const caret = collapsed ? '▸' : '▾';
-            cloudSection += `<div class=\"minimap-item\" style=\"color:#66FFCC; margin:6px 0; padding-left:6px; display:flex; gap:6px; align-items:center;\">`+
-                             `<span style=\\"cursor:pointer;color:#66FFCC;\\" onclick=\\"window.toggleCloud('${cloud.uuid}')\\">${caret}</span>`+
-                             `<span style=\\"flex:1;cursor:pointer;\\" onclick=\\"window.teleportTo('${cloud.uuid}')\\">${displayName} - ${Math.floor(cDist)}m</span>`+
-                             `</div>`;
 
-            if (window.minimapState.gasCollapsed || collapsed) return; // collapsed
+            cloudRows.push({
+                uuid: cloud.uuid,
+                name: displayName,
+                distance: cDist,
+                indent: 6,
+                hasCaret: true,
+                caretSymbol: collapsed ? '▸' : '▾',
+                onCaretClick: () => window.toggleCloud(cloud.uuid),
+                style: { color: '#66FFCC' }
+            });
+
+            if (window.minimapState.gasCollapsed || collapsed) return;
+
             cloud.traverse(child => {
                 if (child === cloud) return;
-                // Only render immediate child nebulae to preserve levels
                 if (child.userData?.isNebula) {
                     let p = child.parent;
                     while (p && p !== cloud && !p.userData?.isNebula) p = p.parent;
-                    if (p === cloud) renderNebula(child, 0);
+                    if (p === cloud) processNebula(child, 0);
                 }
             });
         });
-
-        cloudSection += `</div>`;
-        html += cloudSection;
     }
+    syncCategory('gas', '🌫️ Gas Clouds', '#00FF88', cloudRows, !!window.minimapState.gasCollapsed, 'gas');
 
-    // Orphan nebulae (if any)
+    // 4. Orphan Nebulae
     const orphanNebulae = categories.nebulae.filter(n => !(n.obj.userData && n.obj.userData.parentGasCloud));
-    html += createCategory('Nebulae', orphanNebulae, '✨', '#FF88FF');
-
-    if (minimapList.innerHTML !== html) {
-        minimapList.innerHTML = html;
-    }
+    const nebulaItems = orphanNebulae.map(n => ({
+        uuid: n.obj.uuid,
+        name: n.name.replace('✨ ', ''),
+        distance: n.distance,
+        icon: '✨',
+        style: { color: '#FF88FF', paddingLeft: '12px' }
+    }));
+    syncCategory('nebulae', 'Nebulae', '#FF88FF', nebulaItems);
 }
 
 /**
@@ -280,7 +448,6 @@ export function updateMinimap(shipGroup, galaxyManager, frameCount) {
  * @param {number} frameCount - Current frame count for throttling
  */
 export function updateCompass(shipGroup, galaxyManager, frameCount) {
-    // Throttle compass updates
     if (frameCount % 3 !== 0) return;
 
     const compassContainer = document.getElementById('compass-container');
@@ -289,70 +456,103 @@ export function updateCompass(shipGroup, galaxyManager, frameCount) {
     const targets = galaxyManager.getAllObjects();
     const fov = Math.PI * 0.6; // ~108 degrees visible
 
-    // Find closest target for highlighting
+    // Identify active targets
+    const activeTargets = [];
     let closestTarget = null;
     let closestDist = Infinity;
 
     for (let i = 0; i < targets.length; i++) {
         const target = targets[i];
         const userData = target.userData || {};
-        if (!userData.planetData && !userData.isNebula && !userData.isGasCloud) continue;
+
+        if (!userData.planetData && !userData.isNebula && !userData.isGasCloud && !userData.cloudData) continue;
 
         target.getWorldPosition(scratchVector);
         const dist = shipGroup.position.distanceTo(scratchVector);
+
         if (dist < closestDist) {
             closestDist = dist;
             closestTarget = target;
         }
-    }
-
-    let markersHTML = '';
-    for (let i = 0; i < targets.length; i++) {
-        const target = targets[i];
-        const userData = target.userData || {};
-
-        // Check if it's a valid target
-        if (!userData.planetData && !userData.isNebula && !userData.isGasCloud && !userData.cloudData) continue;
-
-        target.getWorldPosition(scratchVector);
 
         const dx = scratchVector.x - shipGroup.position.x;
         const dz = scratchVector.z - shipGroup.position.z;
-
         const targetAngle = Math.atan2(dx, dz);
         let diff = targetAngle - shipGroup.rotation.y;
 
-        // Normalize -PI to +PI
         while (diff > Math.PI) diff -= Math.PI * 2;
         while (diff < -Math.PI) diff += Math.PI * 2;
 
+        // Only show objects in FRONT (within FOV, not behind)
+        // diff should be within [-fov/2, +fov/2] AND the object should be in front
         if (Math.abs(diff) < fov / 2) {
-            const pct = 50 + (diff / (fov / 2)) * 50;
-
-            // Determine name and style based on type
-            let name = 'Unknown';
-            let markerClass = 'compass-marker';
-            let icon = '';
-
-            if (userData.isNebula) {
-                name = userData.tagName || 'Nebula';
-                markerClass += ' nebula-marker';
-                icon = '✨';
-            } else if (userData.isGasCloud || userData.cloudData) {
-                name = userData.categoryName || userData.cloudData?.name || 'Gas Cloud';
-                markerClass += ' gas-cloud-marker';
-                icon = '🌫️';
-            } else if (userData.planetData) {
-                name = userData.planetData.title || userData.planetData.name;
-                icon = '🌍';
-            }
-
-            const isClosest = target === closestTarget;
-            if (isClosest) markerClass += ' closest-target';
-
-            markersHTML += `<div class="${markerClass}" style="left: ${100 - pct}%">${icon} ${name}</div>`;
+            activeTargets.push({
+                target,
+                diff,
+                dist,
+                userData
+            });
         }
     }
 
-    compassContainer.innerHTML = markersHTML;
+    // Sync Markers
+    const currentIds = new Set();
+
+    activeTargets.forEach(item => {
+        const id = `compass-marker-${item.target.uuid}`;
+        currentIds.add(id);
+
+        let el = document.getElementById(id);
+        if (!el) {
+            el = document.createElement('div');
+            el.id = id;
+            compassContainer.appendChild(el);
+        }
+
+        // Calculate Position
+        const pct = 50 + (item.diff / (fov / 2)) * 50;
+        el.style.left = `${pct}%`;
+
+        // Determine Content
+        let name = 'Unknown';
+        let markerClass = 'compass-marker';
+        let icon = '';
+
+        if (item.userData.isNebula) {
+            name = item.userData.tagName || 'Nebula';
+            markerClass += ' nebula-marker';
+            icon = '✨';
+        } else if (item.userData.isGasCloud || item.userData.cloudData) {
+            name = item.userData.categoryName || item.userData.cloudData?.name || 'Gas Cloud';
+            markerClass += ' gas-cloud-marker';
+            icon = '🌫️';
+        } else if (item.userData.planetData) {
+            name = item.userData.planetData.title || item.userData.planetData.name;
+            icon = '🌍';
+        }
+
+        if (item.target === closestTarget) {
+            markerClass += ' closest-target';
+        }
+
+        // Update Class
+        if (el.className !== markerClass) {
+            el.className = markerClass;
+        }
+
+        // Update Text (Name + Distance)
+        const distStr = formatDistance(item.dist);
+        const text = `${icon} ${name} (${distStr})`;
+
+        if (el.textContent !== text) {
+            el.textContent = text;
+        }
+    });
+
+    // Cleanup
+    Array.from(compassContainer.children).forEach(child => {
+        if (!currentIds.has(child.id)) {
+            compassContainer.removeChild(child);
+        }
+    });
 }

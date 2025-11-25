@@ -1,5 +1,5 @@
 /**
- * @fileoverview Gas Cloud System for Blogs
+ * @fileoverview Gas Cloud System for posts
  * @author CYPT71
  * @description Creates volumetric gas clouds for posts categories with nebulae
  */
@@ -9,7 +9,7 @@ import { createNebula } from './nebula-system.js';
 import { CSS2DObject } from '../infrastructure/css2d-renderer.js';
 
 /**
- * Creates a gas cloud (volumetric particle system) for a blog category
+ * Creates a gas cloud (volumetric particle system) for a posts category
  * @param {THREE.Scene} scene - The scene
  * @param {THREE.Vector3} center - Center position
  * @param {string} categoryName - Category name
@@ -136,9 +136,10 @@ function hashStringToColor(str) {
  * @param {Object} postsData - Parsed posts data from parser
  * @returns {Array} Array of created gas clouds
  */
-export function createBlogGasClouds(scene, postsData) {
+export function createPostsGasClouds(scene, postsData) {
     const gasClouds = [];
     const cloudNames = Object.keys(postsData.gasClouds);
+
 
     cloudNames.forEach((cloudName, index) => {
         const cloudData = postsData.gasClouds[cloudName];
@@ -147,10 +148,10 @@ export function createBlogGasClouds(scene, postsData) {
 
         // Position gas clouds in a ring formation
         const angle = (index / cloudNames.length) * Math.PI * 2;
-        const radius = 1500000; // Far from galaxies
+        const radius = 4000000000; // 4 billion units (proportional to 8B galaxy spacing)
         const center = new THREE.Vector3(
             Math.cos(angle) * radius,
-            (Math.random() - 0.5) * 200000,
+            (Math.random() - 0.5) * 500000000, // +/- 500M height
             Math.sin(angle) * radius
         );
 
@@ -160,22 +161,67 @@ export function createBlogGasClouds(scene, postsData) {
         gasClouds.push(gasCloud);
 
         // Helper: recursively create nebulae hierarchy under this gas cloud
-        const createNebulaTree = (parentGroup, parentCenter, nebulaNode, index, count, level = 0) => {
+        const createNebulaTree = (
+            parentGroup,
+            parentCenter,
+            nebulaNode,
+            index,
+            count,
+            level = 0,
+            parentColor = null
+        ) => {
+            // Angle & radius for this node relative to its parent center
             const angle = (index / Math.max(count, 1)) * Math.PI * 2;
             const radius = 50000 * Math.max(1, 1.2 - level * 0.1);
+
             const centerPos = new THREE.Vector3(
                 parentCenter.x + Math.cos(angle) * radius,
                 parentCenter.y,
                 parentCenter.z + Math.sin(angle) * radius
             );
-            const neb = createNebula(scene, centerPos, nebulaNode.name, (nebulaNode.posts || []).length);
-            neb.userData.parentGasCloud = cloudName;
-            neb.userData.posts = nebulaNode.posts || [];
-            parentGroup.add(neb);
 
+            // Create a group for this nebula node
+            const nodeGroup = new THREE.Group();
+            nodeGroup.position.copy(centerPos);
+
+            // Create the actual nebula mesh *inside* this group
+            const neb = createNebula(
+                scene,
+                new THREE.Vector3(0, 0, 0), // local position inside the group
+                nebulaNode.name,
+                (nebulaNode.posts || []).length,
+                parentColor
+            );
+
+            neb.userData.parentGasCloud = nebulaNode.name; // or whatever you actually want here
+            neb.userData.posts = nebulaNode.posts || [];
+
+            if (neb.userData.posts.length > 0 && typeof neb.visualizePosts === "function") {
+                neb.visualizePosts(neb.userData.posts);
+            }
+
+            // Attach nebula mesh to its group
+            nodeGroup.add(neb);
+
+            // Attach this node group to its parent
+            parentGroup.add(nodeGroup);
+
+            // Children
             const children = Object.values(nebulaNode.nebulae || {});
-            children.forEach((child, i) => createNebulaTree(neb, centerPos, child, i, children.length, level + 1));
+
+            children.forEach((child, i) => {
+                createNebulaTree(
+                    nodeGroup,                // children attach to this node's group
+                    centerPos,                // this node's world center
+                    child,
+                    i,
+                    children.length,
+                    level + 1,
+                    neb.userData.baseColor    // pass color down
+                );
+            });
         };
+
 
         const topNebulae = Object.values(cloudData.nebulae);
         if (topNebulae.length === 0 && cloudData.posts?.length) {

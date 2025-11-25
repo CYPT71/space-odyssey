@@ -7,15 +7,15 @@
 import {
   parseFileSystem,
   isContentFile as _isContentFile,
-  isBlogPost as _isBlogPost,
+  isPostsPost as _isPostsPost,
   getGalaxyColor,
   countPlanets
-} from '../galaxy/parser.js';
+} from '../galaxy/space-tree-internal.js';
 
 /**
  * Parses the flat file list into a hierarchical SpaceTree.
  * @param {Array<Object>} files - window.fileSystem array
- * @returns {Object} SpaceTree { root:{files,galaxies}, blogs:{gasClouds} }
+ * @returns {Object} SpaceTree { root:{files,galaxies}, posts:{gasClouds} }
  */
 export const parseSpaceTree = (files) => parseFileSystem(files);
 
@@ -23,14 +23,14 @@ export const parseSpaceTree = (files) => parseFileSystem(files);
 export const isContentFile = _isContentFile;
 
 /**
- * Returns true if a file represents a page (non-blog content)
+ * Returns true if a file represents a page (non-posts content)
  */
 export const isContentPage = _isContentFile;
 
 /**
- * Returns true if a file represents a blog post
+ * Returns true if a file represents a posts post
  */
-export const isBlogPost = _isBlogPost;
+export const isPostsPost = _isPostsPost;
 
 export { getGalaxyColor, countPlanets };
 

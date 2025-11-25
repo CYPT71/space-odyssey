@@ -126,11 +126,13 @@ export const createUIManager = (audioSystem) => {
                 // Distance for point-like targets (planets, nebulae, clouds)
                 if (type === 'planet' || type === 'gasCloud' || type === 'nebula') {
                     const distance = closestPlanet.distance || 0;
-                    const distanceDisplay = distance < 1 ? '0u' : `${Math.floor(distance)}u`;
+                    // Convert to km and format
+                    const distanceKm = Math.round(distance / 1000);
+                    const distanceDisplay = distanceKm < 1 ? '< 1 km' : `${distanceKm.toLocaleString()} km`;
                     const label = type === 'planet' ? `🌍 ${title}`
                         : type === 'gasCloud' ? title
-                        : type === 'nebula' ? title
-                        : title;
+                            : type === 'nebula' ? title
+                                : title;
                     const txt = `TARGET: ${label} - ${distanceDisplay}`;
                     if (hudTarget.textContent !== txt) hudTarget.textContent = txt;
                 } else {

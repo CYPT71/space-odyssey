@@ -11,8 +11,9 @@ import { createGalaxy, updateGalaxy } from '../galaxy/renderer.js';
 import { createNavigationSystem } from '../galaxy/navigation.js';
 import { createPlanetLikeProcedural } from '../entities/planet-factory.js';
 import { createGalaxyTrails, createAnimatedTrails, updateAnimatedTrails } from './galaxy-trails.js';
-import { createBlogGasClouds, updateGasClouds } from './gas-cloud-system.js';
+import { createPostsGasClouds, updateGasClouds } from './gas-cloud-system.js';
 import { getObjectType, getDetectionRange } from '../core/space-object-utils.js';
+import { Octree } from '../core/octree.js';
 
 /**
  * Space object types
@@ -37,6 +38,7 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
     let rootPlanets = [];
     let animatedTrails = [];
     const navigation = createNavigationSystem(audioSystem);
+    const octree = new Octree(15000000000); // 15 billion units (accommodates 8B galaxy spacing + 4B galaxy size)
 
     // Type and range helpers come from core utils
 
@@ -63,15 +65,16 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
         if (!files) return [];
         return files.map((file, i) => {
             const angle = (i / files.length) * Math.PI * 2;
-            const radius = 3000000 + Math.random() * 7000000;
-            const height = (Math.random() - 0.5) * 1500000;
+            const radius = 8000000 + Math.random() * 20000000; // 8-28M units (proportional to 8B galaxy spacing)
+            const height = (Math.random() - 0.5) * 4000000; // +/- 4M height
+
             const displayTitle = file.tiitle || file.title || file.name;
 
             const mesh = createPlanetLikeProcedural({ name: displayTitle, url: file.url });
             mesh.position.set(
-                Math.cos(angle) * radius + (Math.random() - 0.5) * 500000,
+                Math.cos(angle) * radius + (Math.random() - 0.5) * 1000000, // +/- 1M variation
                 height,
-                Math.sin(angle) * radius + (Math.random() - 0.5) * 500000
+                Math.sin(angle) * radius + (Math.random() - 0.5) * 1000000
             );
 
             mesh.userData = {
@@ -94,7 +97,7 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
 
         return galaxyArray.map((galaxyData, i) => {
             const angle = (i / galaxyArray.length) * Math.PI * 2;
-            const radius = 3000000; // galaxies further apart to prevent overlaps
+            const radius = 8000000000; // 8 billion units (reduced from 30B)
 
             const galaxy = createGalaxy(galaxyData, {
                 x: Math.cos(angle) * radius,
@@ -122,13 +125,13 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
     };
 
     /**
- * Creates gas clouds from blog data
- * @param {Object} blogsData - blogs data
+ * Creates gas clouds from posts data
+ * @param {Object} postsData - posts data
  * @returns {Array} Gas cloud objects
  */
-    const createGasCloudsFromBlogs = (blogsData) => {
+    const createGasCloudsFromposts = (postsData) => {
         // Gas-cloud system now creates clouds and nebulae
-        return createBlogGasClouds(scene, blogsData);
+        return createPostsGasClouds(scene, postsData);
     };
 
     /**
@@ -158,15 +161,20 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
             console.log(`🌌 Created ${galaxies.length} galaxies`);
 
             // Create gas clouds (from /posts/)
-            if (spaceTree.blogs && Object.keys(spaceTree.blogs.gasClouds).length > 0) {
-                console.log(`🌫️ Creating gas clouds from blogs:`, spaceTree.blogs);
-                gasClouds = createGasCloudsFromBlogs(spaceTree.blogs);
+            if (spaceTree.posts && Object.keys(spaceTree.posts.gasClouds).length > 0) {
+                console.log(`🌫️ Creating gas clouds from posts:`, spaceTree.posts);
+                gasClouds = createGasCloudsFromposts(spaceTree.posts);
                 console.log(`🌫️ Created ${gasClouds.length} gas clouds`);
             } else {
-                console.log('⚠️ No blog data found for gas clouds');
+                console.log('⚠️ No posts data found for gas clouds');
             }
 
             console.log(`✨ Total: ${galaxies.length} galaxies, ${gasClouds.length} gas clouds`);
+
+            // Build Octree
+            const allObjects = getAllObjects();
+            octree.rebuild(allObjects);
+            console.log(`🌳 Octree built with ${allObjects.length} objects`);
         };
 
         // Optional: offload parse to Web Worker for responsiveness
@@ -253,37 +261,41 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
      * @param {THREE.Vector3} position - Position to check
      * @returns {Object|null} Closest object data
      */
+    /**
+     * Finds closest object to position using Octree
+     * @param {THREE.Vector3} position - Position to check
+     * @returns {Object|null} Closest object data
+     */
     const findClosest = (position) => {
-        const all = getAllObjects();
-        let closest = null;
-        let minDist = Infinity;
+        // Use Octree for fast spatial query
+        // Search radius: start large, but Octree prunes efficiently
+        const maxSearchDist = 50000000; // 50M units
+        const closestObj = octree.findClosest(position, maxSearchDist);
+
+        if (!closestObj) return null;
+
+        const ud = closestObj.userData || {};
+        const type = getObjectType(ud);
+        if (type === 'unknown') return null;
+
         const scratchPos = new THREE.Vector3();
+        closestObj.getWorldPosition(scratchPos);
+        const dist = position.distanceTo(scratchPos);
+        const range = getDetectionRange(type);
 
-        all.forEach(obj => {
-            const ud = obj.userData || {};
-            const type = getObjectType(ud);
-            if (type === 'unknown') return;
-
-            obj.getWorldPosition(scratchPos);
-            const dist = position.distanceTo(scratchPos);
-
-            const range = getDetectionRange(type);
-            if (dist < range && dist < minDist) {
-                minDist = dist;
-                closest = {
-                    distance: dist,
-                    planetData: ud.planetData,
-                    galaxyData: ud.galaxyData,
-                    cloudData: ud.cloudData,
-                    isGasCloud: ud.isGasCloud,
-                    isNebula: ud.isNebula,
-                    type,
-                    obj
-                };
-            }
-        });
-
-        return closest;
+        if (dist < range) {
+            return {
+                distance: dist,
+                planetData: ud.planetData,
+                galaxyData: ud.galaxyData,
+                cloudData: ud.cloudData,
+                isGasCloud: ud.isGasCloud,
+                isNebula: ud.isNebula,
+                type,
+                obj: closestObj
+            };
+        }
+        return null;
     };
 
     return {

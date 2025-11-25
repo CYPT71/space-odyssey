@@ -25,6 +25,7 @@ import { createGalaxyManager } from './systems/space-object-manager.js';
 import { createSettingsPanel } from './systems/settings.js';
 import { createCameraController } from './systems/camera-controller.js';
 import { createAsteroidField } from './systems/asteroid-system.js';
+import { createMapSystem } from './systems/map-system.js';
 
 // Core Modules (Refactored)
 import { createRenderingSystem } from './core/rendering.js';
@@ -139,6 +140,13 @@ const inputSystem = createInputSystem({
 
 // Setup all event listeners
 inputSystem.setupEventListeners();
+
+// Initialize Map System
+const mapSystem = createMapSystem({
+    galaxyManager,
+    shipGroup,
+    shipControls
+});
 
 // Warp boost integration
 const originalActivateBoost = uiManager.activateWarpBoost.bind(uiManager);

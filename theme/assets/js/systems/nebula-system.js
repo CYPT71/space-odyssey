@@ -15,36 +15,53 @@ import { CSS2DObject } from '../infrastructure/css2d-renderer.js';
  * @param {number} postCount - Number of posts in this tag
  * @returns {THREE.Points} The nebula particle system
  */
-export function createNebula(scene, center, tagName, postCount) {
-    const particleCount = Math.min(postCount * 100, 1000); // Max 1000 particles
-    const radius = 50000 + (postCount * 10000); // Larger for more posts
+/**
+ * Creates a nebula (particle cloud) for a tag cluster
+ * @param {THREE.Scene} scene - The scene
+ * @param {THREE.Vector3} center - Center position
+ * @param {string} tagName - Tag name
+ * @param {number} postCount - Number of posts in this tag
+ * @param {THREE.Color} [parentColor] - Base color from parent (optional)
+ * @returns {THREE.Points} The nebula particle system
+ */
+export function createNebula(scene, center, tagName, postCount, parentColor = null) {
+    // Density increases for inner pockets (smaller radius, same or more particles)
+    const particleCount = Math.min(postCount * 200, 2000);
+    const radius = 50000 + (postCount * 5000);
 
     // Create geometry
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
     const colors = new Float32Array(particleCount * 3);
 
-    // Generate tag-specific color from hash
-    const tagColor = hashStringToColor(tagName);
+    // Determine color: use parent color with shift, or hash if root
+    let baseColor;
+    if (parentColor) {
+        // Shift hue slightly for "pocket" effect
+        const hsl = {};
+        parentColor.getHSL(hsl);
+        baseColor = new THREE.Color().setHSL((hsl.h + 0.05) % 1.0, hsl.s, hsl.l + 0.1); // Lighter and shifted
+    } else {
+        baseColor = hashStringToColor(tagName);
+    }
 
     // Generate particles in spherical distribution
     for (let i = 0; i < particleCount; i++) {
         const i3 = i * 3;
 
-        // Spherical distribution
+        // Spherical distribution (more dense core)
         const theta = Math.random() * Math.PI * 2;
         const phi = Math.acos(2 * Math.random() - 1);
-        const r = radius * Math.cbrt(Math.random()); // Cubic root for uniform volume distribution
+        const r = radius * Math.pow(Math.random(), 0.4); // More center-weighted
 
-        // Local-space positions; set mesh position to center
         positions[i3] = r * Math.sin(phi) * Math.cos(theta);
         positions[i3 + 1] = r * Math.sin(phi) * Math.sin(theta);
         positions[i3 + 2] = r * Math.cos(phi);
 
-        // Color with slight variation
-        colors[i3] = tagColor.r + (Math.random() - 0.5) * 0.2;
-        colors[i3 + 1] = tagColor.g + (Math.random() - 0.5) * 0.2;
-        colors[i3 + 2] = tagColor.b + (Math.random() - 0.5) * 0.2;
+        // Color variation
+        colors[i3] = baseColor.r + (Math.random() - 0.5) * 0.1;
+        colors[i3 + 1] = baseColor.g + (Math.random() - 0.5) * 0.1;
+        colors[i3 + 2] = baseColor.b + (Math.random() - 0.5) * 0.1;
     }
 
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -52,10 +69,10 @@ export function createNebula(scene, center, tagName, postCount) {
 
     // Create material
     const material = new THREE.PointsMaterial({
-        size: 5000, // Increased size for visibility
+        size: 4000,
         vertexColors: true,
         transparent: true,
-        opacity: 0.8, // Increased opacity
+        opacity: 0.6, // Dense
         blending: THREE.AdditiveBlending,
         depthWrite: false,
         sizeAttenuation: true
@@ -69,7 +86,8 @@ export function createNebula(scene, center, tagName, postCount) {
         isNebula: true,
         tagName: tagName,
         postCount: postCount,
-        center: center.clone()
+        center: center.clone(),
+        baseColor: baseColor // Store for children
     };
 
     // Add a label for the nebula
@@ -77,10 +95,43 @@ export function createNebula(scene, center, tagName, postCount) {
     div.className = 'planet-label';
     div.textContent = (tagName || 'Nebula').toUpperCase();
     const label = new CSS2DObject(div);
-    label.position.set(0, 15000, 0);
+    label.position.set(0, radius * 0.8, 0);
     nebula.add(label);
 
-    // Caller is responsible for parenting; we no longer add to scene here
+    // VISUALIZE FILES (POSTS)
+    // If this nebula has posts, render them as bright stars inside
+    // We don't have the posts array passed here directly in the signature, 
+    // but the caller usually attaches it to userData. 
+    // We'll add a helper to visualize them if called.
+    nebula.visualizePosts = (posts) => {
+        if (!posts || posts.length === 0) return;
+
+        const fileGeo = new THREE.BufferGeometry();
+        const filePos = new Float32Array(posts.length * 3);
+
+        posts.forEach((post, i) => {
+            // Random position within nebula
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            const r = radius * 0.6 * Math.cbrt(Math.random()); // Inner 60%
+
+            filePos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+            filePos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+            filePos[i * 3 + 2] = r * Math.cos(phi);
+        });
+
+        fileGeo.setAttribute('position', new THREE.BufferAttribute(filePos, 3));
+        const fileMat = new THREE.PointsMaterial({
+            color: 0xFFFFFF,
+            size: 2000, // Bright stars
+            transparent: true,
+            opacity: 0.9,
+            blending: THREE.AdditiveBlending
+        });
+        const filePoints = new THREE.Points(fileGeo, fileMat);
+        nebula.add(filePoints);
+    };
+
     return nebula;
 }
 
@@ -164,6 +215,10 @@ export function createTagNebulae(scene, posts) {
 
         // Create nebula
         const nebula = createNebula(scene, center, tagName, clusterPosts.length);
+        // Visualize posts inside this nebula
+        if (clusterPosts.length > 0) {
+            nebula.visualizePosts(clusterPosts);
+        }
         nebulae.push(nebula);
 
         console.log(`✨ Created nebula for tag "${tagName}" with ${clusterPosts.length} posts`);

@@ -1,8 +1,8 @@
 /**
  * @fileoverview Ship Controls System - Clean Architecture
  * @author CYPT71
- * @version 3.0.0
- * @description Handles ship movement, rotation, and physics with clean separation of concerns
+ * @version 3.1.0
+ * @description Handles ship movement, rotation, physics, and autopilot
  */
 
 import * as THREE from 'three';
@@ -18,7 +18,8 @@ const WARP_SPEEDS = {
     2: 8000,     // Warp 2
     3: 27000,    // Warp 3
     4: 64000,    // Warp 4
-    5: 125000    // Warp 5
+    5: 125000,   // Warp 5
+    20: 5000000  // Warp 20 (AUTOPILOT ONLY) - Extreme speed with space deformation
 };
 
 const ROTATION_CONFIG = {
@@ -52,7 +53,15 @@ const createShipState = () => ({
     lastWarpChange: 0,
     rotVel: { x: 0, y: 0, z: 0 },
     targetBankAngle: 0,
-    currentBankAngle: 0
+    currentBankAngle: 0,
+    // Autopilot State
+    autopilot: {
+        active: false,
+        targetPos: null,
+        targetObj: null,
+        minDistance: 15000000, // Default 15,000 km
+        warp20Active: false // Warp 20 mode
+    }
 });
 
 /**
@@ -234,6 +243,106 @@ const applyVerticalMovement = (shipGroup, state, controls) => {
 };
 
 // ============================================================
+// AUTOPILOT SYSTEM
+// ============================================================
+
+const updateAutopilot = (shipGroup, state) => {
+    try {
+        if (!state.autopilot.active) return;
+
+        // Determine target position dynamically
+        let targetPos;
+        if (state.autopilot.targetObject && state.autopilot.targetObject.getWorldPosition) {
+            targetPos = new THREE.Vector3();
+            state.autopilot.targetObject.getWorldPosition(targetPos);
+        } else if (state.autopilot.targetPos) {
+            targetPos = state.autopilot.targetPos.clone();
+        } else {
+            console.warn('Autopilot active but no target defined');
+            state.autopilot.active = false;
+            return;
+        }
+        const currentPos = shipGroup.position;
+
+        // Validate positions
+        if (!isFinite(targetPos.x) || !isFinite(targetPos.y) || !isFinite(targetPos.z)) {
+            console.error('Invalid target position in autopilot:', targetPos);
+            state.autopilot.active = false;
+            return;
+        }
+
+        const distance = currentPos.distanceTo(targetPos);
+        // Determine stop distance based on object type
+        const ud = state.autopilot.targetObject?.userData || {};
+        let stopDist = 100000; // default 100 km for planets
+        if (ud.isGasCloud || ud.cloudData) {
+            stopDist = 500000; // 500 km for gas clouds
+        } else if (ud.galaxyData || ud.isGalaxy) {
+            stopDist = 0; // stop at centre of galaxy
+        } else if (ud.isNebula) {
+            stopDist = 0; // stop at centre of nebula
+        }
+        state.autopilot.minDistance = stopDist;
+
+        // Validate distance
+        if (!isFinite(distance)) {
+            console.error('Invalid distance in autopilot:', distance);
+            state.autopilot.active = false;
+            return;
+        }
+
+        // Arrival check
+        if (distance <= stopDist) {
+            state.speed = 0;
+            state.warpLevel = 0;
+            state.autopilot.active = false;
+            state.autopilot.warp20Active = false;
+            console.log('Autopilot: Arrived at destination');
+            return;
+        }
+
+        // Steering towards target
+        const direction = new THREE.Vector3().subVectors(targetPos, currentPos).normalize();
+        const targetRotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
+        shipGroup.quaternion.slerp(targetRotation, 0.05);
+
+        // Speed control with Warp 20 persistence
+        let desiredWarp = 0;
+        if (distance > stopDist + 200000) { // keep Warp 20 until within 200 km of stop point
+            desiredWarp = 20;
+            state.autopilot.warp20Active = true;
+        } else {
+            state.autopilot.warp20Active = false;
+            if (distance > stopDist + 50000) desiredWarp = 5;
+            else if (distance > stopDist + 10000) desiredWarp = 4;
+            else if (distance > stopDist + 5000) desiredWarp = 3;
+            else if (distance > stopDist + 2000) desiredWarp = 2;
+            else if (distance > stopDist + 500) desiredWarp = 1;
+            else desiredWarp = 0; // impulse for final approach
+        }
+
+        // Apply warp change
+        if (state.warpLevel !== desiredWarp) {
+            state.warpLevel = desiredWarp;
+            state.speed = calculateSpeed(state.warpLevel);
+            state.lastWarpChange = Date.now();
+        }
+
+        // Ensure forward motion
+        const targetSpeed = calculateSpeed(state.warpLevel);
+        if (isFinite(targetSpeed) && state.speed < targetSpeed) {
+            state.speed = targetSpeed;
+        }
+    } catch (error) {
+        console.error('Error in autopilot update:', error);
+        state.autopilot.active = false;
+        state.autopilot.warp20Active = false;
+        state.speed = 0;
+        state.warpLevel = 0;
+    }
+};
+
+// ============================================================
 // GRAVITY SYSTEM
 // ============================================================
 
@@ -308,6 +417,12 @@ export const createShipControls = (shipGroup) => {
         state.keys[e.key] = true;
         if (e.key === ' ') e.preventDefault();
 
+        // Manual input disengages autopilot
+        if (state.autopilot.active && ['w', 'a', 's', 'd', 'q', 'e', 'z', 'x', 'c', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+            state.autopilot.active = false;
+            console.log('Autopilot: Disengaged by manual input');
+        }
+
         if (key === controls.forward) changeWarpLevel(state, 1);
         if (key === controls.backward) changeWarpLevel(state, -1);
     };
@@ -332,15 +447,25 @@ export const createShipControls = (shipGroup) => {
         if (isKeyPressed(state, controls.stop)) {
             state.warpLevel = 0;
             state.speed = 0;
+            state.autopilot.active = false;
         }
 
-        // Apply all systems
-        applyForwardMovement(shipGroup, state);
-        applyRotationalInertia(state, controls);
-        updateBanking(state, controls);
-        applyRotation(shipGroup, state);
-        applyStrafeMovement(shipGroup, state, controls);
-        applyVerticalMovement(shipGroup, state, controls);
+        if (state.autopilot.active) {
+            updateAutopilot(shipGroup, state);
+            applyForwardMovement(shipGroup, state);
+            // Banking during autopilot?
+            // We can simulate banking based on turn rate, but for now keep it stable.
+            state.currentBankAngle *= 0.95; // Return to level
+            applyRotation(shipGroup, state);
+        } else {
+            // Manual Control
+            applyForwardMovement(shipGroup, state);
+            applyRotationalInertia(state, controls);
+            updateBanking(state, controls);
+            applyRotation(shipGroup, state);
+            applyStrafeMovement(shipGroup, state, controls);
+            applyVerticalMovement(shipGroup, state, controls);
+        }
     };
 
     /**
@@ -361,6 +486,17 @@ export const createShipControls = (shipGroup) => {
         activateWarpBoost: () => {
             state.warpLevel = 5;
             state.speed = WARP_SPEEDS[5];
-        }
+        },
+        engageAutopilot: (targetPos, minDistance = 15000000) => {
+            state.autopilot.active = true;
+            state.autopilot.targetPos = targetPos;
+            state.autopilot.minDistance = minDistance;
+            console.log('Autopilot: Engaged', targetPos, minDistance);
+        },
+        disengageAutopilot: () => {
+            state.autopilot.active = false;
+            state.autopilot.warp20Active = false;
+        },
+        isWarp20Active: () => state.autopilot.warp20Active
     };
 };

@@ -79,9 +79,16 @@ export const createAudioSystem = () => {
     const updateEngineSound = (warpLevel) => {
         if (!initialized || !engineSound) return;
 
+        // Validate and clamp warp level
+        if (!isFinite(warpLevel)) {
+            console.warn('Invalid warpLevel in updateEngineSound:', warpLevel);
+            return;
+        }
+
         // Use absolute warp level for frequency lookup (handle reverse)
         const absLevel = Math.abs(warpLevel);
-        const engineFreq = AUDIO.ENGINE.FREQUENCIES[Math.min(absLevel, 5)] || AUDIO.ENGINE.BASE_FREQUENCY;
+        const clampedLevel = Math.min(absLevel, 5); // Clamp to 0-5 for audio
+        const engineFreq = AUDIO.ENGINE.FREQUENCIES[clampedLevel] || AUDIO.ENGINE.BASE_FREQUENCY;
 
         engineSound.gainNode.gain.setTargetAtTime(
             absLevel > 0 ? AUDIO.ENGINE.VOLUME : 0.01,
@@ -103,14 +110,34 @@ export const createAudioSystem = () => {
     const updateWarpSound = (warpLevel) => {
         if (!initialized || !warpSound) return;
 
-        if (warpLevel >= 3) {
+        // Validate and clamp warp level
+        if (!isFinite(warpLevel) || warpLevel === null || warpLevel === undefined) {
+            console.warn('Invalid warpLevel in updateWarpSound:', warpLevel);
+            return;
+        }
+
+        // CRITICAL: Warp 20 should use Warp 5 audio (max available)
+        // Clamp warp level to valid audio range (0-5)
+        const clampedLevel = Math.min(Math.max(Math.floor(warpLevel), 0), 5);
+
+        if (clampedLevel >= 3) {
+            // Map warp level 3-5 to frequency index 0-2
+            const freqIndex = Math.min(clampedLevel - 3, 2);
+            const frequency = AUDIO.WARP.FREQUENCIES[freqIndex];
+
+            // Extra safety check
+            if (!isFinite(frequency)) {
+                console.error('Invalid frequency for warp level:', clampedLevel, frequency);
+                return;
+            }
+
             warpSound.gainNode.gain.setTargetAtTime(
                 AUDIO.WARP.VOLUME,
                 audioContext.currentTime,
                 0.01
             );
             warpSound.oscillator.frequency.setTargetAtTime(
-                AUDIO.WARP.FREQUENCIES[warpLevel - 3],
+                frequency,
                 audioContext.currentTime,
                 0.01
             );

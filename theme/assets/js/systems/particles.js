@@ -25,10 +25,10 @@ export class ParticleSystem {
         const colorArray = new Float32Array(starsCount * 3); // COULEURS
 
         for (let i = 0; i < starsCount; i++) {
-            // Positions - Volume initial (sera replié par le modulo)
-            posArray[i * 3] = (Math.random() - 0.5) * 4000000;
-            posArray[i * 3 + 1] = (Math.random() - 0.5) * 4000000;
-            posArray[i * 3 + 2] = (Math.random() - 0.5) * 4000000;
+            // Positions - Volume initial (scaled to match wrapping size)
+            posArray[i * 3] = (Math.random() - 0.5) * 100000000; // 100M units
+            posArray[i * 3 + 1] = (Math.random() - 0.5) * 100000000;
+            posArray[i * 3 + 2] = (Math.random() - 0.5) * 100000000;
 
             // COULEURS VARIÉES (étoiles bleues, rouges, jaunes, blanches)
             const starType = Math.random();
@@ -145,18 +145,28 @@ export class ParticleSystem {
         return particles;
     }
 
-    update(speed) {
+    update(speed, isWarp20 = false) {
         // === WARP TRAILS EFFECT ===
-        // Augmenter la taille des étoiles en fonction de la vitesse
         const absSpeed = Math.abs(speed);
 
-        if (absSpeed > 27000) { // Warp 3+
-            // Effet tunnel de lumière - augmente la taille mais garde les couleurs
-            const warpIntensity = Math.min((absSpeed - 27000) / 98000, 1); // 0-1 pour Warp 3-5
-            this.starMaterial.size = 1500 + (warpIntensity * 3000); // 1500-4500
-            this.starMaterial.opacity = 0.8 + (warpIntensity * 0.2); // Plus brillant
-        } else {
-            // Retour à la normale
+        // WARP 20: EXTREME SPACE DEFORMATION
+        if (isWarp20) {
+            // Massive star stretching and tunnel effect
+            this.starMaterial.size = 8000; // Huge stretched stars
+            this.starMaterial.opacity = 1.0; // Maximum brightness
+
+            // Add pulsing effect
+            const pulse = Math.sin(Date.now() * 0.01) * 0.2;
+            this.starMaterial.size += pulse * 2000;
+        }
+        // Warp 3+ effects
+        else if (absSpeed > 27000) {
+            const warpIntensity = Math.min((absSpeed - 27000) / 98000, 1);
+            this.starMaterial.size = 1500 + (warpIntensity * 3000);
+            this.starMaterial.opacity = 0.8 + (warpIntensity * 0.2);
+        }
+        // Normal
+        else {
             this.starMaterial.size = 1500;
             this.starMaterial.opacity = 0.8;
         }
@@ -169,25 +179,12 @@ export class ParticleSystem {
         const shipPos = this.shipGroup.position;
 
         // Size of the repeating universe cube
-        // Large enough to not see the repetition pattern easily
-        const UNIVERSE_SIZE = 4000000;
+        // MASSIVELY INCREASED to match new galaxy scale (30B units)
+        // This prevents empty zones between galaxies
+        const UNIVERSE_SIZE = 100000000; // 100M units (was 4M)
         const HALF_SIZE = UNIVERSE_SIZE / 2;
 
         for (let i = 0; i < this.starsCount; i++) {
-            // Get original base position (stored or calculated)
-            // Here we assume the current position is the base position + offset
-            // But to avoid drift, we should ideally store base positions.
-
-            // For now, we'll just apply the modulo logic to the current positions relative to ship.
-            // Actually, the best way is:
-            // StarPosition = (BasePosition - ShipPosition) % UniverseSize
-            // But we don't have BasePosition stored separately.
-
-            // Let's use a simpler approach:
-            // If a star is too far behind, move it way ahead.
-            // If a star is too far ahead, move it way behind.
-            // But do it strictly on axes to keep the "grid" aligned.
-
             let x = positions[i * 3];
             let y = positions[i * 3 + 1];
             let z = positions[i * 3 + 2];

@@ -174,6 +174,17 @@ export const createSettingsPanel = () => {
     // Load saved controls
     loadControls();
 
+    // Load autopilot confirmation setting
+    const autopilotCheckbox = document.getElementById('autopilot-confirmation');
+    if (autopilotCheckbox) {
+        const saved = localStorage.getItem('autopilotConfirmation');
+        autopilotCheckbox.checked = saved !== 'false'; // Default to true
+
+        autopilotCheckbox.addEventListener('change', () => {
+            localStorage.setItem('autopilotConfirmation', autopilotCheckbox.checked);
+        });
+    }
+
     return {
         open,
         close,

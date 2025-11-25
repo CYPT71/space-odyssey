@@ -15,6 +15,7 @@ import * as THREE from 'three';
 export function createNavigationSystem(container, camera) {
     const trackedPlanets = []; // Array of planets to track
     let waypointElement = null; // Single waypoint element
+    let centralArrow = null; // Central direction arrow
 
     // Create HUD container if not exists
     let hudLayer = document.getElementById('hud-layer');
@@ -31,6 +32,25 @@ export function createNavigationSystem(container, camera) {
         hudLayer.style.zIndex = '10';
         container.appendChild(hudLayer);
     }
+
+    // Central direction arrow (always visible)
+    const centerArrow = document.createElement('div');
+    centerArrow.className = 'nav-center-arrow';
+    // Arrow style (pointing up by default)
+    centerArrow.style.position = 'absolute';
+    centerArrow.style.left = '50%';
+    centerArrow.style.top = '50%';
+    centerArrow.style.transform = 'translate(-50%, -50%) rotate(0deg)';
+    centerArrow.style.width = '0';
+    centerArrow.style.height = '0';
+    centerArrow.style.borderLeft = '12px solid transparent';
+    centerArrow.style.borderRight = '12px solid transparent';
+    centerArrow.style.borderBottom = '20px solid #FF0000'; // red arrow
+    centerArrow.style.zIndex = '11';
+    hudLayer.appendChild(centerArrow);
+    // Store reference
+    centralArrow = centerArrow;
+
 
     /**
      * Creates the single waypoint element
@@ -131,7 +151,7 @@ export function createNavigationSystem(container, camera) {
 
         // Calculate distance
         const dist = shipPosition.distanceTo(targetPlanet.position);
-        const distKm = Math.round(dist / 1000).toLocaleString() + ' Mm';
+        const distKm = Math.round(dist / 1000).toLocaleString() + ' km';
         waypointElement.querySelector('.nav-dist').textContent = distKm;
         waypointElement.querySelector('.nav-name').textContent =
             targetPlanet.userData.planetData?.name || 'Unknown';

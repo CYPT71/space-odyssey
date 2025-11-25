@@ -22,22 +22,65 @@ const EXCLUDED_PATTERNS = [
 ];
 
 /**
+ * Shared structure properties for the hierarchy nodes. Switching between
+ * galaxy and nebula behaviour is only a matter of swapping this config.
+ */
+const HIERARCHY_NODE_PROPS = Object.freeze({
+    galaxy: {
+        childKey: 'subGalaxies',
+        leafKey: 'files',
+        typeFlag: 'isGalaxy'
+    },
+    nebula: {
+        childKey: 'nebulae',
+        leafKey: 'posts',
+        typeFlag: 'isNebula'
+    }
+});
+
+const normalizeInput = (path, url) => ({ path: path || '', url: url || '' });
+
+/**
+ * Creates a classifier that decides whether a file belongs to a collection and
+ * keeps a consistent exclusion strategy.
+ *
+ * @param {Object} options - Predicate configuration
+ * @param {Array<RegExp>} options.includePaths - Path prefixes that qualify
+ * @param {Array<RegExp>} options.includeUrls - URL prefixes that qualify
+ * @param {Array<string>} [options.extensions] - Required file extensions (paths)
+ * @param {Array<RegExp>} [options.disallow] - Extra patterns that should reject
+ * @param {boolean} [options.requireUrl] - Whether a valid URL is mandatory
+ * @returns {(path: string, url: string) => boolean}
+ */
+const makeFileClassifier = ({ includePaths, includeUrls, extensions = ['.md'], disallow = [], requireUrl = false }) => {
+    return (path, url) => {
+        const { path: safePath, url: safeUrl } = normalizeInput(path, url);
+        if (requireUrl && !safeUrl) return false;
+        if (disallow.some(pattern => pattern.test(safePath) || pattern.test(safeUrl))) return false;
+        if (EXCLUDED_PATTERNS.some(pattern => pattern.test(safePath))) return false;
+
+        const pathAllowed = includePaths.some(prefix => prefix.test(safePath));
+        const urlAllowed = includeUrls.some(prefix => prefix.test(safeUrl));
+        if (!pathAllowed && !urlAllowed) return false;
+
+        if (extensions.length > 0 && !extensions.some(ext => safePath.endsWith(ext))) return false;
+
+        return true;
+    };
+};
+
+/**
  * Checks if a file should be included as content
  * ONLY files in / can create galaxies
  * @param {string} path - File path
  * @returns {boolean} True if content file in /
  */
-export const isContentFile = (path, url) => {
-    // Accept Markdown source files OR any page-like URL that is not a posts post
-    const isMd = typeof path === 'string' && path.endsWith('.md');
-    const looksLikePageUrl = typeof url === 'string' && url.length > 0 && !url.startsWith('/posts/');
-    // Exclude posts posts by URL or by path prefix
-    const isPostsByPath = typeof path === 'string' && (path.startsWith('/posts/') || path.startsWith('content/_posts/'));
-    if (isPostsByPath || (typeof url === 'string' && url.startsWith('/posts/'))) return false;
-    // Exclude technical files by path
-    if (typeof path === 'string' && EXCLUDED_PATTERNS.some(pattern => pattern.test(path))) return false;
-    return isMd || looksLikePageUrl;
-};
+export const isContentFile = makeFileClassifier({
+    includePaths: [/^\//, /^content\/_pages\//, /^_pages\//],
+    includeUrls: [/^\//],
+    disallow: [/^\/posts\//],
+    extensions: []
+});
 
 /**
  * Checks if a file is a posts post
@@ -45,55 +88,127 @@ export const isContentFile = (path, url) => {
  * @param {string} path - File path
  * @returns {boolean} True if posts post in /posts/
  */
-export const isPostsPost = (path, url) => {
-    // Accept posts posts under /posts/ (by URL) or content/_posts/ (by path)
-    const byPath = typeof path === 'string' && (path.startsWith('/posts/') || path.startsWith('content/_posts/'));
-    const byUrl = typeof url === 'string' && url.startsWith('/posts/');
-    if (!byPath && !byUrl) return false;
-    // If using path-based detection, ensure it's a Markdown source file
-    if (byPath && !path.endsWith('.md')) return false;
-    return !EXCLUDED_PATTERNS.some(pattern => pattern.test(path || ''));
+export const isPostsPost = makeFileClassifier({
+    includePaths: [/^\/posts\//, /^content\/_posts\//],
+    includeUrls: [/^\/posts\//],
+    extensions: ['.md'],
+    requireUrl: false
+});
+
+/**
+ * Removes standard prefixes/affixes from a path and optionally seeds a default
+ * first segment when the path is otherwise a leaf.
+ *
+ * @param {Object} config - Configuration for the cleaner
+ * @param {Array<string>} config.prefixes - Prefixes to drop from the raw path
+ * @param {string} [config.defaultFirstSegment] - Segment to inject when the
+ * path only contains a single element
+ * @returns {(file: Object) => string[]} Function that produces normalized parts
+ */
+const makePartsParser = ({ prefixes, defaultFirstSegment }) => (file) => {
+    let raw = (file.url && typeof file.url === 'string') ? file.url : (file.path || '');
+
+    prefixes.forEach(prefix => {
+        raw = raw.replace(new RegExp(`^${prefix}`), '');
+    });
+
+    raw = raw.replace(/^\//, '')
+        .replace(/\/$/, '')
+        .replace(/\.md$/, '')
+        .replace(/\.html?$/, '');
+
+    const parts = raw.split('/').filter(Boolean);
+    return (defaultFirstSegment && parts.length === 1)
+        ? [defaultFirstSegment, ...parts]
+        : parts;
 };
 
 /**
- * Adds file to galaxy hierarchy recursively
- * @param {Object} galaxy - Galaxy object
+ * Creates a hierarchical node that can represent either a galaxy or nebula.
+ * The only behavioral difference between the two is the flag stored on the
+ * node, which downstream systems can use to pick the appropriate renderer.
+ *
+ * @param {string} name - Node name
+ * @param {string} childKey - Property name for children
+ * @param {string} leafKey - Property name for leaf collection
+ * @param {string} [typeFlag] - Boolean flag stored on the node (e.g. 'isGalaxy' or 'isNebula')
+ * @returns {Object} Hierarchy node
+ */
+const createHierarchyNode = (name, childKey, leafKey, typeFlag) => ({
+    name,
+    [leafKey]: [],
+    [childKey]: {},
+    ...(typeFlag ? { [typeFlag]: true } : {})
+});
+
+/**
+ * Generates a function that returns the parent node and remaining parts for a
+ * hierarchy insertion, or null when the item should be attached directly to
+ * the root handler.
+ *
+ * @param {Object} rootBucket - Dictionary that contains the top-level nodes
+ * @param {Object} nodeProps - Hierarchy node properties
+ * @param {number} [minDepth=0] - Minimum number of parts required before
+ * assigning to a hierarchy node (values <= minDepth go to the root handler)
+ * @returns {(parts: string[]) => ({ parentNode: Object, remainingParts: string[] }|null)}
+ */
+const makeContainerGetter = (rootBucket, nodeProps, minDepth = 0) => (parts) => {
+    if (!Array.isArray(parts) || parts.length <= minDepth) return null;
+    const topLevelName = parts[0];
+    const parentNode = getOrCreateNode(rootBucket, topLevelName, nodeProps);
+    return { parentNode, remainingParts: parts.slice(1) };
+};
+
+/**
+ * Gets (or creates) a hierarchy node from a dictionary using shared options.
+ *
+ * @param {Object} bucket - Dictionary of nodes
+ * @param {string} name - Node name
+ * @param {Object} options - Hierarchy options
+ * @param {string} options.childKey - Property name for children
+ * @param {string} options.leafKey - Property name for leaves
+ * @param {string} [options.typeFlag] - Flag name to set on the node
+ * @returns {Object} The fetched or newly created node
+ */
+const getOrCreateNode = (bucket, name, { childKey, leafKey, typeFlag }) => {
+    if (!bucket[name]) {
+        bucket[name] = createHierarchyNode(name, childKey, leafKey, typeFlag);
+        console.log('🌀 create node', name, typeFlag ? `(${typeFlag})` : '');
+    }
+    return bucket[name];
+};
+
+/**
+ * Adds a file/post to a hierarchical node (galaxy or nebula) recursively.
+ *
+ * @param {Object} node - Hierarchy node
  * @param {Array} pathParts - Remaining path parts
  * @param {Object} file - File data
+ * @param {Object} options - Configuration
+ * @param {string} options.childKey - Property name for children
+ * @param {string} options.leafKey - Property name for leaves
+ * @param {string} options.typeFlag - Boolean flag to set on child nodes
  * @returns {void}
  */
-const addToGalaxy = (galaxy, pathParts, file) => {
-    // Safety: if no more parts, treat as file in current galaxy
-    if (!Array.isArray(pathParts) || pathParts.length === 0) {
-        galaxy.files.push(file);
+const addToHierarchy = (node, pathParts, file, { childKey, leafKey, typeFlag }) => {
+    if (!Array.isArray(pathParts) || pathParts.length <= 1) {
+        node[leafKey].push(file);
         return;
     }
 
-    if (pathParts.length === 1) {
-        // File directly in this galaxy
-        galaxy.files.push(file);
-        return;
-    }
-
-    // File in sub-galaxy
-    const subGalaxyName = pathParts[0];
+    const childName = pathParts[0];
 
     // Guard against bad/empty segment to avoid infinite recursion
-    if (!subGalaxyName || subGalaxyName === '.') {
-        galaxy.files.push(file);
+    if (!childName || childName === '.') {
+        node[leafKey].push(file);
         return;
     }
 
-    if (!galaxy.subGalaxies[subGalaxyName]) {
-        galaxy.subGalaxies[subGalaxyName] = {
-            name: subGalaxyName,
-            files: [],
-            subGalaxies: {}
-        };
-    }
-
-    addToGalaxy(galaxy.subGalaxies[subGalaxyName], pathParts.slice(1), file);
+    const childNode = getOrCreateNode(node[childKey], childName, { childKey, leafKey, typeFlag });
+    addToHierarchy(childNode, pathParts.slice(1), file, { childKey, leafKey, typeFlag });
 };
+
+const noop = () => {};
 
 /**
  * Parses file system into galaxy hierarchy
@@ -117,105 +232,127 @@ export const parseFileSystem = (files) => {
         console.log('📄 First file example:', files[0]);
     }
 
-    // Filter content files (pages)
-    const contentFiles = files.filter(f => {
-        const isContent = isContentFile(f.path, f.url);
-        if (!isContent && !isPostsPost(f.path, f.url) && !EXCLUDED_PATTERNS.some(p => p.test(f.path))) {
-            console.log('❌ Rejected:', f.path);
-        }
-        return isContent;
-    });
+    const classifyFiles = (list, classifiers) => {
+        const buckets = Object.fromEntries(classifiers.map(({ key }) => [key, []]));
+        const reject = [];
 
-    // Filter posts posts
-    const postsPosts = files.filter(f => isPostsPost(f.path, f.url));
-
-    console.log(`✅ Accepted ${contentFiles.length} pages and ${postsPosts.length} posts`);
-
-    // Helper to normalize page parts from URL/path
-    const pagePartsFrom = (file) => {
-        let p = (file.url && typeof file.url === 'string') ? file.url : (file.path || '');
-        p = p.replace(/^\//, '')
-            .replace(/^content\/_pages\//, '')
-            .replace(/^_pages\//, '')
-            .replace(/\/$/, '')
-            .replace(/\.html?$/, '')
-            .replace(/\.md$/, '');
-        const parts = p.split('/').filter(Boolean);
-        console.log('🧭 page parts', { url: file.url, path: file.path, parts });
-        return parts;
-    };
-
-    // Process pages → Galaxies (iterative)
-    contentFiles.forEach(file => {
-        const parts = pagePartsFrom(file);
-
-        // Root files (/, /about, /projects …)
-        if (parts.length === 0 || parts.length === 1) {
-            tree.root.files.push(file);
-            console.log('📄 root file', file.url || file.path);
-            return;
-        }
-
-        // test/lorem1 -> galaxy "test"; test/test2/lorem6 -> galaxy "test" -> sub "test2"
-        const galaxyName = parts[0];
-        if (!tree.root.galaxies[galaxyName]) {
-            tree.root.galaxies[galaxyName] = { name: galaxyName, files: [], subGalaxies: {} };
-            console.log('🌀 create top galaxy', galaxyName);
-        }
-        addToGalaxy(tree.root.galaxies[galaxyName], parts.slice(1), file);
-    });
-
-    // Helpers for posts posts
-    const ensureCloud = (name) => {
-        if (!tree.posts.gasClouds[name]) {
-            tree.posts.gasClouds[name] = { name, posts: [], nebulae: {} };
-            console.log('☁️ create gas cloud', name);
-        }
-        return tree.posts.gasClouds[name];
-    };
-
-    const ensureNebulaPath = (cloudNode, dirs) => {
-        let node = cloudNode;
-        for (const dir of dirs) {
-            if (!dir) continue;
-            if (!node.nebulae[dir]) {
-                node.nebulae[dir] = { name: dir, posts: [], nebulae: {} };
-                console.log('✨ create nebula', { cloud: cloudNode.name, name: dir });
+        list.forEach((file) => {
+            const classifier = classifiers.find(({ test }) => test(file.path, file.url));
+            if (classifier) {
+                buckets[classifier.key].push(file);
+                return;
             }
-            node = node.nebulae[dir];
-        }
-        return node;
+
+            if (!EXCLUDED_PATTERNS.some(p => p.test(file.path))) {
+                reject.push(file.path);
+            }
+        });
+
+        return { buckets, reject };
     };
 
-    // Process posts → Gas Clouds with Nebulae (iterative & logged)
-    postsPosts.forEach(file => {
-        // Build parts from URL or path and strip prefixes/extensions
-        let p = (file.url && file.url.startsWith('/posts/'))
-            ? file.url.replace(/^\/?posts\//, '')
-            : (file.path || '').replace(/^posts\//, '').replace(/^content\/_posts\//, '');
-        p = p.replace(/^\//, '').replace(/\/$/, '').replace(/\.md$/, '').replace(/\.html?$/, '');
-        const parts = p.split('/').filter(Boolean);
-        console.log('🧭 post parts', { url: file.url, path: file.path, parts });
+    const { buckets, reject } = classifyFiles(files, [
+        { key: 'pages', test: isContentFile },
+        { key: 'posts', test: isPostsPost }
+    ]);
 
-        if (parts.length === 1) {
-            const key = 'uncategorized';
-            ensureCloud(key).posts.push(file);
-            console.log('📝 add post to Uncategorized');
-            return;
-        }
+    reject.forEach(path => console.log('❌ Rejected:', path));
+    console.log(`✅ Accepted ${buckets.pages.length} pages and ${buckets.posts.length} posts`);
 
-        const cloudName = parts[0];
-        const cloudNode = ensureCloud(cloudName);
-        const dirs = parts.slice(1, -1); // directories only, last is filename slug
-        if (dirs.length === 0) {
-            cloudNode.posts.push(file);
-            console.log('📝 add post to cloud', cloudName);
-        } else {
-            const neb = ensureNebulaPath(cloudNode, dirs);
-            neb.posts.push(file);
-            console.log('📝 add post to nebula', { cloud: cloudName, path: dirs.join('/') });
-        }
+    const pagePartsFrom = makePartsParser({ prefixes: ['/', 'content/_pages/', '_pages/'] });
+
+    const buildHierarchy = (items, options) => {
+        const {
+            getParts,
+            handleRootLeaf,
+            getContainer,
+            childKey,
+            leafKey,
+            typeFlag,
+            onAssigned,
+            onParts
+        } = options;
+
+        items.forEach(file => {
+            const parts = getParts(file);
+            if (typeof onParts === 'function') {
+                onParts(file, parts);
+            }
+            const containerInfo = getContainer(parts, file);
+
+            if (!containerInfo) {
+                handleRootLeaf(file, parts);
+                return;
+            }
+
+            const { parentNode, remainingParts } = containerInfo;
+            if (!remainingParts.length) {
+                handleRootLeaf(file, parts);
+                return;
+            }
+
+            addToHierarchy(parentNode, remainingParts, file, { childKey, leafKey, typeFlag });
+
+            if (typeof onAssigned === 'function') {
+                onAssigned(file, parts, parentNode.name);
+            }
+        });
+    };
+
+    const galaxyNodeProps = HIERARCHY_NODE_PROPS.galaxy;
+    const nebulaNodeProps = HIERARCHY_NODE_PROPS.nebula;
+    const postPartsFrom = makePartsParser({
+        prefixes: ['/?posts/', '/posts/', 'posts/', 'content/_posts/'],
+        defaultFirstSegment: 'uncategorized'
     });
+
+    const partsLogger = (label) => (file, parts) => {
+        console.log(label, { url: file.url, path: file.path, parts });
+    };
+
+    const hierarchyConfigs = [
+        {
+            items: buckets.pages,
+            nodeProps: galaxyNodeProps,
+            getParts: pagePartsFrom,
+            handleRootLeaf: (file) => {
+                tree.root.files.push(file);
+                console.log('📄 root file', file.url || file.path);
+            },
+            getContainer: makeContainerGetter(tree.root.galaxies, galaxyNodeProps, 1),
+            onParts: partsLogger('🧭 page parts'),
+            onAssigned: (file, parts, galaxyName) => {
+                if (parts.length <= 1) return;
+                console.log('📝 add page to galaxy', { galaxy: galaxyName, path: parts.slice(1).join('/') });
+            }
+        },
+        {
+            items: buckets.posts,
+            nodeProps: nebulaNodeProps,
+            getParts: postPartsFrom,
+            handleRootLeaf: noop,
+            getContainer: makeContainerGetter(tree.posts.gasClouds, nebulaNodeProps),
+            onParts: partsLogger('🧭 post parts'),
+            onAssigned: (_file, parts, cloudName) => {
+                const nebulaPath = parts.slice(1, -1);
+                if (nebulaPath.length > 0) {
+                    console.log('📝 add post to nebula', { cloud: cloudName, path: nebulaPath.join('/') });
+                } else {
+                    console.log('📝 add post to cloud', cloudName);
+                }
+            }
+        }
+    ];
+
+    const processHierarchies = (configs) => {
+        if (!Array.isArray(configs) || configs.length === 0) return;
+        const [current, ...rest] = configs;
+        const { items, nodeProps, ...options } = current;
+        buildHierarchy(items, { ...nodeProps, ...options });
+        processHierarchies(rest);
+    };
+
+    processHierarchies(hierarchyConfigs);
 
     console.log('🌳 Parsed tree', tree);
 

@@ -104,13 +104,41 @@ export const createUIManager = (audioSystem) => {
         }
 
         if (hudTarget) {
-            if (closestPlanet && closestPlanet.planetData) {
-                // Afficher la distance à la planète
-                const distance = closestPlanet.distance || 0;
-                const distanceDisplay = distance < 1 ? '0u' : `${Math.floor(distance)}u`;
-                hudTarget.textContent = `TARGET: ${closestPlanet.planetData.name} - ${distanceDisplay}`;
+            // Allow string input (e.g., direct teleport set a name)
+            if (typeof closestPlanet === 'string') {
+                const txt = `TARGET: ${closestPlanet}`;
+                if (hudTarget.textContent !== txt) hudTarget.textContent = txt;
+            } else if (closestPlanet) {
+                const type = closestPlanet.type || (closestPlanet.planetData ? 'planet' : closestPlanet.galaxyData ? 'galaxy' : (closestPlanet.isGasCloud ? 'gasCloud' : (closestPlanet.isNebula ? 'nebula' : 'unknown')));
+
+                // Build title per type
+                let title = 'Object';
+                if (type === 'planet') {
+                    title = closestPlanet.planetData.title || closestPlanet.planetData.name;
+                } else if (type === 'galaxy') {
+                    title = closestPlanet.galaxyData.name;
+                } else if (type === 'gasCloud') {
+                    title = `🌫️ ${closestPlanet.obj?.userData?.categoryName || 'Gas Cloud'}`;
+                } else if (type === 'nebula') {
+                    title = `✨ ${closestPlanet.obj?.userData?.tagName || 'Nebula'}`;
+                }
+
+                // Distance for point-like targets (planets, nebulae, clouds)
+                if (type === 'planet' || type === 'gasCloud' || type === 'nebula') {
+                    const distance = closestPlanet.distance || 0;
+                    const distanceDisplay = distance < 1 ? '0u' : `${Math.floor(distance)}u`;
+                    const label = type === 'planet' ? `🌍 ${title}`
+                        : type === 'gasCloud' ? title
+                        : type === 'nebula' ? title
+                        : title;
+                    const txt = `TARGET: ${label} - ${distanceDisplay}`;
+                    if (hudTarget.textContent !== txt) hudTarget.textContent = txt;
+                } else {
+                    const txt = `TARGET: ${title}`;
+                    if (hudTarget.textContent !== txt) hudTarget.textContent = txt;
+                }
             } else {
-                hudTarget.textContent = 'TARGET: NONE';
+                if (hudTarget.textContent !== 'TARGET: NONE') hudTarget.textContent = 'TARGET: NONE';
             }
         }
     };

@@ -1,10 +1,12 @@
 /**
  * @fileoverview Gas Cloud System for Blogs
  * @author CYPT71
- * @description Creates volumetric gas clouds for blog categories with nebulae
+ * @description Creates volumetric gas clouds for posts categories with nebulae
  */
 
 import * as THREE from 'three';
+import { createNebula } from './nebula-system.js';
+import { CSS2DObject } from '../infrastructure/css2d-renderer.js';
 
 /**
  * Creates a gas cloud (volumetric particle system) for a blog category
@@ -35,9 +37,10 @@ export function createGasCloud(scene, center, categoryName, postCount) {
         const phi = Math.acos(2 * Math.random() - 1);
         const r = radius * Math.pow(Math.random(), 0.5); // Square root for volume distribution
 
-        positions[i3] = center.x + r * Math.sin(phi) * Math.cos(theta);
-        positions[i3 + 1] = center.y + r * Math.sin(phi) * Math.sin(theta);
-        positions[i3 + 2] = center.z + r * Math.cos(phi);
+        // Local space positions; we position the whole cloud at 'center'
+        positions[i3] = r * Math.sin(phi) * Math.cos(theta);
+        positions[i3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+        positions[i3 + 2] = r * Math.cos(phi);
 
         // Color with variation (more variation at edges)
         const distRatio = r / radius;
@@ -65,6 +68,7 @@ export function createGasCloud(scene, center, categoryName, postCount) {
     });
 
     const gasCloud = new THREE.Points(geometry, material);
+    gasCloud.position.copy(center);
 
     gasCloud.userData = {
         isGasCloud: true,
@@ -72,6 +76,14 @@ export function createGasCloud(scene, center, categoryName, postCount) {
         postCount: postCount,
         center: center.clone()
     };
+
+    // Label for gas cloud
+    const div = document.createElement('div');
+    div.className = 'planet-label';
+    div.textContent = categoryName.toUpperCase();
+    const label = new CSS2DObject(div);
+    label.position.set(0, 20000, 0);
+    gasCloud.add(label);
 
     scene.add(gasCloud);
     return gasCloud;
@@ -119,17 +131,17 @@ function hashStringToColor(str) {
 }
 
 /**
- * Creates all gas clouds for blog categories
+ * Creates all gas clouds for posts categories
  * @param {THREE.Scene} scene - The scene
- * @param {Object} blogsData - Parsed blogs data from parser
+ * @param {Object} postsData - Parsed posts data from parser
  * @returns {Array} Array of created gas clouds
  */
-export function createBlogGasClouds(scene, blogsData) {
+export function createBlogGasClouds(scene, postsData) {
     const gasClouds = [];
-    const cloudNames = Object.keys(blogsData.gasClouds);
+    const cloudNames = Object.keys(postsData.gasClouds);
 
     cloudNames.forEach((cloudName, index) => {
-        const cloudData = blogsData.gasClouds[cloudName];
+        const cloudData = postsData.gasClouds[cloudName];
         const totalPosts = cloudData.posts.length +
             Object.values(cloudData.nebulae).reduce((sum, neb) => sum + neb.posts.length, 0);
 
@@ -143,32 +155,38 @@ export function createBlogGasClouds(scene, blogsData) {
         );
 
         const gasCloud = createGasCloud(scene, center, cloudName, totalPosts);
+        // Attach full data for UI/journal
+        gasCloud.userData.cloudData = cloudData;
         gasClouds.push(gasCloud);
 
-        // Create nebulae within the gas cloud for sub-categories
-        Object.keys(cloudData.nebulae).forEach((nebulaName, nebulaIndex) => {
-            const nebulaData = cloudData.nebulae[nebulaName];
-
-            // Position nebula within gas cloud
-            const nebulaAngle = (nebulaIndex / Object.keys(cloudData.nebulae).length) * Math.PI * 2;
-            const nebulaRadius = 50000;
-            const nebulaCenter = new THREE.Vector3(
-                center.x + Math.cos(nebulaAngle) * nebulaRadius,
-                center.y,
-                center.z + Math.sin(nebulaAngle) * nebulaRadius
+        // Helper: recursively create nebulae hierarchy under this gas cloud
+        const createNebulaTree = (parentGroup, parentCenter, nebulaNode, index, count, level = 0) => {
+            const angle = (index / Math.max(count, 1)) * Math.PI * 2;
+            const radius = 50000 * Math.max(1, 1.2 - level * 0.1);
+            const centerPos = new THREE.Vector3(
+                parentCenter.x + Math.cos(angle) * radius,
+                parentCenter.y,
+                parentCenter.z + Math.sin(angle) * radius
             );
+            const neb = createNebula(scene, centerPos, nebulaNode.name, (nebulaNode.posts || []).length);
+            neb.userData.parentGasCloud = cloudName;
+            neb.userData.posts = nebulaNode.posts || [];
+            parentGroup.add(neb);
 
-            // Import nebula system
-            import('./nebula-system.js').then(({ createNebula }) => {
-                const nebula = createNebula(
-                    scene,
-                    nebulaCenter,
-                    nebulaName,
-                    nebulaData.posts.length
-                );
-                nebula.userData.parentGasCloud = cloudName;
-            });
-        });
+            const children = Object.values(nebulaNode.nebulae || {});
+            children.forEach((child, i) => createNebulaTree(neb, centerPos, child, i, children.length, level + 1));
+        };
+
+        const topNebulae = Object.values(cloudData.nebulae);
+        if (topNebulae.length === 0 && cloudData.posts?.length) {
+            // Default single cluster
+            const neb = createNebula(scene, center.clone(), 'cluster', cloudData.posts.length);
+            neb.userData.parentGasCloud = cloudName;
+            neb.userData.posts = cloudData.posts;
+            gasCloud.add(neb);
+        } else {
+            topNebulae.forEach((node, i) => createNebulaTree(gasCloud, center, node, i, topNebulae.length, 0));
+        }
     });
 
     return gasClouds;

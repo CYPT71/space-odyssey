@@ -91,7 +91,8 @@ export const createAsteroidField = (scene, count = 1000, position = new THREE.Ve
         const { position: pos, rotation: rot, scale: scl } = generator.next().value;
 
         dummy.position.copy(pos);
-        dummy.rotation.copy(rot);
+        // rot is a Quaternion; copy to dummy.quaternion to avoid Euler order=undefined warnings
+        dummy.quaternion.copy(rot);
         dummy.scale.copy(scl);
         dummy.updateMatrix();
 

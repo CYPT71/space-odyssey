@@ -6,8 +6,9 @@
 
 import * as THREE from 'three';
 import { createSpiralParticles, createGalaxyCore } from './particles.js';
-import { getGalaxyColor, countPlanets } from './parser.js';
+import { getGalaxyColor, countPlanets } from '../domain/space-tree.js';
 import { CSS2DObject } from '../infrastructure/css2d-renderer.js';
+import { createPlanetLikeProcedural } from '../entities/planet-factory.js';
 
 /**
  * Creates a planet mesh
@@ -15,35 +16,39 @@ import { CSS2DObject } from '../infrastructure/css2d-renderer.js';
  * @returns {THREE.Mesh} Planet mesh
  */
 const createPlanetMesh = (data) => {
-    const geometry = new THREE.IcosahedronGeometry(data.size || 5, 1);
-    const material = new THREE.MeshStandardMaterial({
-        color: data.color || 0x00F0FF,
-        emissive: data.color || 0x00F0FF,
-        emissiveIntensity: 0.5,
-        roughness: 0.7,
-        metalness: 0.3
-    });
-
-    const mesh = new THREE.Mesh(geometry, material);
+    const mesh = createPlanetLikeProcedural({ name: data.name, url: data.url, color: data.color });
     mesh.position.set(data.position.x, data.position.y, data.position.z);
-
-    // Label
-    const div = document.createElement('div');
-    div.className = 'planet-label';
-    div.textContent = data.name;
-    const label = new CSS2DObject(div);
-    label.position.set(0, data.size + 10000, 0); // x1000
-    mesh.add(label);
-
-    // ROTATION: Vitesse variable selon la taille
-    const rotationSpeed = (1 / (data.size || 5)) * 0.0001;
-    mesh.userData = {
-        planetData: data,
-        rotationSpeed: rotationSpeed
-    };
-
     return mesh;
 };
+
+// Generate non-overlapping planet positions using simple rejection sampling
+function generatePlanetPositions(count, baseRadius, heightRange, minSeparation) {
+    const positions = [];
+    const maxTries = 64;
+    for (let i = 0; i < count; i++) {
+        let placed = false;
+        for (let t = 0; t < maxTries && !placed; t++) {
+            const angle = Math.random() * Math.PI * 2;
+            const radius = baseRadius * (1.0 + (Math.random() - 0.5) * 0.4) + Math.random() * 60000;
+            const height = (Math.random() - 0.5) * heightRange;
+            const pos = new THREE.Vector3(
+                Math.cos(angle) * radius + (Math.random() - 0.5) * 50000,
+                height,
+                Math.sin(angle) * radius + (Math.random() - 0.5) * 50000
+            );
+            let ok = true;
+            for (let j = 0; j < positions.length; j++) {
+                if (pos.distanceTo(positions[j]) < minSeparation) { ok = false; break; }
+            }
+            if (ok) { positions.push(pos); placed = true; }
+        }
+        if (!placed) {
+            // fallback: push with slight offset
+            positions.push(new THREE.Vector3((Math.random()-0.5)*baseRadius, (Math.random()-0.5)*heightRange, (Math.random()-0.5)*baseRadius));
+        }
+    }
+    return positions;
+}
 
 /**
  * Creates a galaxy (functional)
@@ -56,35 +61,29 @@ export const createGalaxy = (galaxyData, position = { x: 0, y: 0, z: 0 }) => {
     const color = getGalaxyColor(galaxyData.name);
     const planetCount = countPlanets(galaxyData);
 
-    // Spiral particles - ULTRA MASSIVE SCALE
-    const particles = createSpiralParticles(planetCount * 100, color, 200000); // x1000 size
+    // Spiral particles - more space in galaxies
+    const particles = createSpiralParticles(planetCount * 180, color, 800000);
     group.add(particles);
 
     // Core glow - ULTRA MASSIVE
-    const core = createGalaxyCore(color, 3000); // x1000 size
+    const core = createGalaxyCore(color, 18000);
     group.add(core);
 
     // Planets in orbit (randomized 3D positions) - ULTRA MASSIVE
+    const baseRadius = 900000; // larger orbit radius for more space
+    const heightRange = 260000; // +/- height range
+    const minSep = 90000; // minimal distance between planet centers
+    const positions = generatePlanetPositions(galaxyData.files.length, baseRadius, heightRange, minSep);
     galaxyData.files.forEach((file, i) => {
-        const angle = (i / galaxyData.files.length) * Math.PI * 2;
-        const radius = 100000 + Math.random() * 100000; // x1000: 100k-200k units
-        const height = (Math.random() - 0.5) * 150000; // x1000: ±75k units
-
-        // VARIED SIZES: 10k-30k units diameter (x1000)
-        const size = 10000 + Math.random() * 20000;
-
+        const pos = positions[i];
+        const displayName = file.tiitle || file.title || file.name;
         const planet = createPlanetMesh({
-            name: file.title || file.name,
+            name: displayName,
+            title: displayName,
             url: file.url,
-            size: size,
             color: color,
-            position: {
-                x: Math.cos(angle) * radius + (Math.random() - 0.5) * 50000,
-                y: height,
-                z: Math.sin(angle) * radius + (Math.random() - 0.5) * 50000
-            }
+            position: { x: pos.x, y: pos.y, z: pos.z }
         });
-
         group.add(planet);
     });
 
@@ -92,7 +91,7 @@ export const createGalaxy = (galaxyData, position = { x: 0, y: 0, z: 0 }) => {
     const subGalaxies = Object.values(galaxyData.subGalaxies);
     subGalaxies.forEach((subGalaxy, i) => {
         const angle = (i / subGalaxies.length) * Math.PI * 2;
-        const radius = 300000; // x1000: Much further out
+        const radius = 1400000; // much further from core for larger scale
 
         const subGroupResult = createGalaxy(subGalaxy, {
             x: Math.cos(angle) * radius,
@@ -110,7 +109,7 @@ export const createGalaxy = (galaxyData, position = { x: 0, y: 0, z: 0 }) => {
     labelDiv.className = 'galaxy-label';
     labelDiv.textContent = `🌌 ${galaxyData.name.toUpperCase()}`;
     const galaxyLabel = new CSS2DObject(labelDiv);
-    galaxyLabel.position.set(0, 250000, 0); // x1000: Much higher
+    galaxyLabel.position.set(0, 400000, 0);
     group.add(galaxyLabel);
 
     group.position.set(position.x, position.y, position.z);

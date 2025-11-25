@@ -31,6 +31,7 @@ import { createRenderingSystem } from './core/rendering.js';
 import { createPhysicsSystem } from './core/physics.js';
 import { createInputSystem } from './core/input.js';
 import { updateMinimap, updateCompass } from './core/hud-utils.js';
+import { showLoading, hideLoading } from './systems/tutorial.js';
 
 // ============================================================
 // INITIALIZATION
@@ -38,6 +39,7 @@ import { updateMinimap, updateCompass } from './core/hud-utils.js';
 
 // Initialize scene, camera, and renderers
 const { scene, camera, renderer, composer, labelRenderer } = initScene();
+showLoading();
 const clock = new THREE.Clock();
 
 // Create the player's ship
@@ -92,6 +94,8 @@ const initGalaxy = () => {
             );
             createAsteroidField(scene, 1000, pos);
         }
+        hideLoading();
+        window.dispatchEvent(new CustomEvent('universeReady'));
     } else {
         console.log('⏳ Waiting for file system...');
         setTimeout(initGalaxy, 100);

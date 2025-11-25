@@ -1,10 +1,11 @@
 /**
  * @fileoverview Nebula System - Tag-based Clustering
  * @author CYPT71
- * @description Creates visual nebulae that cluster blog posts by tags
+ * @description Creates visual nebulae that cluster posts posts by tags
  */
 
 import * as THREE from 'three';
+import { CSS2DObject } from '../infrastructure/css2d-renderer.js';
 
 /**
  * Creates a nebula (particle cloud) for a tag cluster
@@ -35,9 +36,10 @@ export function createNebula(scene, center, tagName, postCount) {
         const phi = Math.acos(2 * Math.random() - 1);
         const r = radius * Math.cbrt(Math.random()); // Cubic root for uniform volume distribution
 
-        positions[i3] = center.x + r * Math.sin(phi) * Math.cos(theta);
-        positions[i3 + 1] = center.y + r * Math.sin(phi) * Math.sin(theta);
-        positions[i3 + 2] = center.z + r * Math.cos(phi);
+        // Local-space positions; set mesh position to center
+        positions[i3] = r * Math.sin(phi) * Math.cos(theta);
+        positions[i3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+        positions[i3 + 2] = r * Math.cos(phi);
 
         // Color with slight variation
         colors[i3] = tagColor.r + (Math.random() - 0.5) * 0.2;
@@ -60,6 +62,7 @@ export function createNebula(scene, center, tagName, postCount) {
     });
 
     const nebula = new THREE.Points(geometry, material);
+    nebula.position.copy(center);
 
     // Store metadata
     nebula.userData = {
@@ -69,7 +72,15 @@ export function createNebula(scene, center, tagName, postCount) {
         center: center.clone()
     };
 
-    scene.add(nebula);
+    // Add a label for the nebula
+    const div = document.createElement('div');
+    div.className = 'planet-label';
+    div.textContent = (tagName || 'Nebula').toUpperCase();
+    const label = new CSS2DObject(div);
+    label.position.set(0, 15000, 0);
+    nebula.add(label);
+
+    // Caller is responsible for parenting; we no longer add to scene here
     return nebula;
 }
 

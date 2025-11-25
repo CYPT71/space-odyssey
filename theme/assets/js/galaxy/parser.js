@@ -27,34 +27,32 @@ const EXCLUDED_PATTERNS = [
  * @param {string} path - File path
  * @returns {boolean} True if content file in /
  */
-export const isContentFile = (path) => {
-    // Accept any markdown file that is not a blog post
-    if (!path.endsWith('.md')) {
-        return false;
-    }
-    // Exclude blog posts – they start with /posts/ or content/_posts/
-    if (path.startsWith('/posts/') || path.startsWith('content/_posts/')) {
-        return false;
-    }
-    // Exclude technical directories (already handled by EXCLUDED_PATTERNS)
-    return !EXCLUDED_PATTERNS.some(pattern => pattern.test(path));
+export const isContentFile = (path, url) => {
+    // Accept Markdown source files OR any page-like URL that is not a blog post
+    const isMd = typeof path === 'string' && path.endsWith('.md');
+    const looksLikePageUrl = typeof url === 'string' && url.length > 0 && !url.startsWith('/posts/');
+    // Exclude blog posts by URL or by path prefix
+    const isBlogByPath = typeof path === 'string' && (path.startsWith('/posts/') || path.startsWith('content/_posts/'));
+    if (isBlogByPath || (typeof url === 'string' && url.startsWith('/posts/'))) return false;
+    // Exclude technical files by path
+    if (typeof path === 'string' && EXCLUDED_PATTERNS.some(pattern => pattern.test(path))) return false;
+    return isMd || looksLikePageUrl;
 };
 
 /**
- * Checks if a file is a blog post
+ * Checks if a file is a posts post
  * ONLY files in /posts/ create gas clouds
  * @param {string} path - File path
- * @returns {boolean} True if blog post in /posts/
+ * @returns {boolean} True if posts post in /posts/
  */
-export const isBlogPost = (path) => {
-    // Accept blog posts under /posts/ or content/_posts/
-    if (!(path.startsWith('/posts/') || path.startsWith('content/_posts/'))) {
-        return false;
-    }
-    if (!path.endsWith('.md')) {
-        return false;
-    }
-    return !EXCLUDED_PATTERNS.some(pattern => pattern.test(path));
+export const isBlogPost = (path, url) => {
+    // Accept blog posts under /posts/ (by URL) or content/_posts/ (by path)
+    const byPath = typeof path === 'string' && (path.startsWith('/posts/') || path.startsWith('content/_posts/'));
+    const byUrl = typeof url === 'string' && url.startsWith('/posts/');
+    if (!byPath && !byUrl) return false;
+    // If using path-based detection, ensure it's a Markdown source file
+    if (byPath && !path.endsWith('.md')) return false;
+    return !EXCLUDED_PATTERNS.some(pattern => pattern.test(path || ''));
 };
 
 /**
@@ -65,23 +63,36 @@ export const isBlogPost = (path) => {
  * @returns {void}
  */
 const addToGalaxy = (galaxy, pathParts, file) => {
+    // Safety: if no more parts, treat as file in current galaxy
+    if (!Array.isArray(pathParts) || pathParts.length === 0) {
+        galaxy.files.push(file);
+        return;
+    }
+
     if (pathParts.length === 1) {
         // File directly in this galaxy
         galaxy.files.push(file);
-    } else {
-        // File in sub-galaxy
-        const subGalaxyName = pathParts[0];
-
-        if (!galaxy.subGalaxies[subGalaxyName]) {
-            galaxy.subGalaxies[subGalaxyName] = {
-                name: subGalaxyName,
-                files: [],
-                subGalaxies: {}
-            };
-        }
-
-        addToGalaxy(galaxy.subGalaxies[subGalaxyName], pathParts.slice(1), file);
+        return;
     }
+
+    // File in sub-galaxy
+    const subGalaxyName = pathParts[0];
+
+    // Guard against bad/empty segment to avoid infinite recursion
+    if (!subGalaxyName || subGalaxyName === '.') {
+        galaxy.files.push(file);
+        return;
+    }
+
+    if (!galaxy.subGalaxies[subGalaxyName]) {
+        galaxy.subGalaxies[subGalaxyName] = {
+            name: subGalaxyName,
+            files: [],
+            subGalaxies: {}
+        };
+    }
+
+    addToGalaxy(galaxy.subGalaxies[subGalaxyName], pathParts.slice(1), file);
 };
 
 /**
@@ -108,99 +119,105 @@ export const parseFileSystem = (files) => {
 
     // Filter content files (pages)
     const contentFiles = files.filter(f => {
-        const isContent = isContentFile(f.path);
-        if (!isContent && !isBlogPost(f.path) && !EXCLUDED_PATTERNS.some(p => p.test(f.path))) {
-            // console.log('❌ Rejected:', f.path);
+        const isContent = isContentFile(f.path, f.url);
+        if (!isContent && !isBlogPost(f.path, f.url) && !EXCLUDED_PATTERNS.some(p => p.test(f.path))) {
+            console.log('❌ Rejected:', f.path);
         }
         return isContent;
     });
 
     // Filter blog posts
-    const blogPosts = files.filter(f => isBlogPost(f.path));
+    const blogPosts = files.filter(f => isBlogPost(f.path, f.url));
 
     console.log(`✅ Accepted ${contentFiles.length} pages and ${blogPosts.length} posts`);
 
-    // Process pages → Galaxies
-    // Process pages → Galaxies
+    // Helper to normalize page parts from URL/path
+    const pagePartsFrom = (file) => {
+        let p = (file.url && typeof file.url === 'string') ? file.url : (file.path || '');
+        p = p.replace(/^\//, '')
+             .replace(/^content\/_pages\//, '')
+             .replace(/^_pages\//, '')
+             .replace(/\/$/, '')
+             .replace(/\.html?$/, '')
+             .replace(/\.md$/, '');
+        const parts = p.split('/').filter(Boolean);
+        console.log('🧭 page parts', { url: file.url, path: file.path, parts });
+        return parts;
+    };
+
+    // Process pages → Galaxies (iterative)
     contentFiles.forEach(file => {
-        // Strip known prefixes to get a clean relative path
-        let relativePath = file.path;
-        // Remove leading '/' if present
-        relativePath = relativePath.replace(/^\//, '');
-        // Remove content/_pages/ or _pages/ prefix if present
-        relativePath = relativePath.replace(/^content\/_pages\//, '').replace(/^_pages\//, '');
-        const parts = relativePath.split('/').filter(p => p);
+        const parts = pagePartsFrom(file);
 
-        // If file is at root (e.g. index.md, about.md), it's a root planet
-        if (parts.length === 1) {
+        // Root files (/, /about, /projects …)
+        if (parts.length === 0 || parts.length === 1) {
             tree.root.files.push(file);
-        } else {
-            // File in subdirectory → Planet in galaxy
-            // e.g. test/lorem1.md -> galaxy "test", file "lorem1.md"
-            const galaxyName = parts[0];
-            const subPath = parts.slice(1);
-
-            if (!tree.root.galaxies[galaxyName]) {
-                tree.root.galaxies[galaxyName] = {
-                    name: galaxyName,
-                    files: [],
-                    subGalaxies: {}
-                };
-            }
-
-            addToGalaxy(tree.root.galaxies[galaxyName], subPath, file);
+            console.log('📄 root file', file.url || file.path);
+            return;
         }
+
+        // test/lorem1 -> galaxy "test"; test/test2/lorem6 -> galaxy "test" -> sub "test2"
+        const galaxyName = parts[0];
+        if (!tree.root.galaxies[galaxyName]) {
+            tree.root.galaxies[galaxyName] = { name: galaxyName, files: [], subGalaxies: {} };
+            console.log('🌀 create top galaxy', galaxyName);
+        }
+        addToGalaxy(tree.root.galaxies[galaxyName], parts.slice(1), file);
     });
 
-    // Process blogs → Gas Clouds with Nebulae
+    // Helpers for blog posts
+    const ensureCloud = (name) => {
+        if (!tree.blogs.gasClouds[name]) {
+            tree.blogs.gasClouds[name] = { name, posts: [], nebulae: {} };
+            console.log('☁️ create gas cloud', name);
+        }
+        return tree.blogs.gasClouds[name];
+    };
+
+    const ensureNebulaPath = (cloudNode, dirs) => {
+        let node = cloudNode;
+        for (const dir of dirs) {
+            if (!dir) continue;
+            if (!node.nebulae[dir]) {
+                node.nebulae[dir] = { name: dir, posts: [], nebulae: {} };
+                console.log('✨ create nebula', { cloud: cloudNode.name, name: dir });
+            }
+            node = node.nebulae[dir];
+        }
+        return node;
+    };
+
+    // Process blogs → Gas Clouds with Nebulae (iterative & logged)
     blogPosts.forEach(file => {
-        // Strip known prefixes for blog posts
-        let relativePath = file.path;
-        // Remove leading '/' if present
-        relativePath = relativePath.replace(/^\//, '');
-        // Remove posts/ or content/_posts/ prefix
-        relativePath = relativePath.replace(/^posts\//, '').replace(/^content\/_posts\//, '');
-        const parts = relativePath.split('/').filter(p => p);
+        // Build parts from URL or path and strip prefixes/extensions
+        let p = (file.url && file.url.startsWith('/posts/'))
+            ? file.url.replace(/^\/?posts\//, '')
+            : (file.path || '').replace(/^posts\//, '').replace(/^content\/_posts\//, '');
+        p = p.replace(/^\//, '').replace(/\/$/, '').replace(/\.md$/, '').replace(/\.html?$/, '');
+        const parts = p.split('/').filter(Boolean);
+        console.log('🧭 post parts', { url: file.url, path: file.path, parts });
 
         if (parts.length === 1) {
-            // Post directly in /posts/ → Create default gas cloud
-            if (!tree.blogs.gasClouds['uncategorized']) {
-                tree.blogs.gasClouds['uncategorized'] = {
-                    name: 'Uncategorized',
-                    posts: [],
-                    nebulae: {}
-                };
-            }
-            tree.blogs.gasClouds['uncategorized'].posts.push(file);
+            const key = 'uncategorized';
+            ensureCloud(key).posts.push(file);
+            console.log('📝 add post to Uncategorized');
+            return;
+        }
+
+        const cloudName = parts[0];
+        const cloudNode = ensureCloud(cloudName);
+        const dirs = parts.slice(1, -1); // directories only, last is filename slug
+        if (dirs.length === 0) {
+            cloudNode.posts.push(file);
+            console.log('📝 add post to cloud', cloudName);
         } else {
-            // Post in subdirectory → Nebula in gas cloud
-            const cloudName = parts[0];
-            const subPath = parts.slice(1);
-
-            if (!tree.blogs.gasClouds[cloudName]) {
-                tree.blogs.gasClouds[cloudName] = {
-                    name: cloudName,
-                    posts: [],
-                    nebulae: {}
-                };
-            }
-
-            if (subPath.length === 1) {
-                // Post directly in category
-                tree.blogs.gasClouds[cloudName].posts.push(file);
-            } else {
-                // Post in sub-nebula
-                const nebulaName = subPath[0];
-                if (!tree.blogs.gasClouds[cloudName].nebulae[nebulaName]) {
-                    tree.blogs.gasClouds[cloudName].nebulae[nebulaName] = {
-                        name: nebulaName,
-                        posts: []
-                    };
-                }
-                tree.blogs.gasClouds[cloudName].nebulae[nebulaName].posts.push(file);
-            }
+            const neb = ensureNebulaPath(cloudNode, dirs);
+            neb.posts.push(file);
+            console.log('📝 add post to nebula', { cloud: cloudName, path: dirs.join('/') });
         }
     });
+
+    console.log('🌳 Parsed tree', tree);
 
     return tree;
 };

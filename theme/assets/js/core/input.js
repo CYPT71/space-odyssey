@@ -23,6 +23,62 @@ export function createInputSystem(systems) {
 
     const scratchVector = new THREE.Vector3();
 
+    // Custom confirmation modal (replaces native confirm())
+    const showTeleportConfirm = (title, message, onConfirm, onCancel) => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9998;';
+
+        const modal = document.createElement('div');
+        modal.style.cssText = [
+            'position:fixed',
+            'top:50%','left:50%','transform:translate(-50%,-50%)',
+            'background:rgba(0,20,40,0.95)',
+            'border:2px solid #00F0FF',
+            'padding:20px','min-width:320px',
+            'color:#00F0FF','font-family:monospace','text-align:center',
+            'box-shadow:0 0 20px rgba(0,240,255,0.5)',
+            'z-index:9999'
+        ].join(';');
+
+        const h = document.createElement('div');
+        h.textContent = title || 'Pilot Confirmation';
+        h.style.cssText = 'font-weight:bold;font-size:18px;margin-bottom:8px;';
+        modal.appendChild(h);
+
+        const p = document.createElement('div');
+        p.textContent = message || '';
+        p.style.cssText = 'opacity:0.9;margin-bottom:14px;';
+        modal.appendChild(p);
+
+        const btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex;gap:12px;justify-content:center;';
+
+        const yes = document.createElement('button');
+        yes.textContent = 'ENGAGE WARP';
+        yes.style.cssText = 'padding:8px 14px;border:1px solid #00F0FF;background:transparent;color:#00F0FF;cursor:pointer;';
+        yes.onclick = () => {
+            document.body.removeChild(overlay);
+            document.body.removeChild(modal);
+            onConfirm && onConfirm();
+        };
+
+        const no = document.createElement('button');
+        no.textContent = 'CANCEL';
+        no.style.cssText = 'padding:8px 14px;border:1px solid #FF3366;background:transparent;color:#FF3366;cursor:pointer;';
+        no.onclick = () => {
+            document.body.removeChild(overlay);
+            document.body.removeChild(modal);
+            onCancel && onCancel();
+        };
+
+        btnRow.appendChild(yes);
+        btnRow.appendChild(no);
+        modal.appendChild(btnRow);
+
+        document.body.appendChild(overlay);
+        document.body.appendChild(modal);
+    };
+
     /**
      * Triggers teleport visual effect
      */
@@ -43,16 +99,50 @@ export function createInputSystem(systems) {
     const interceptLinksInContent = (container) => {
         const links = container.querySelectorAll('a[href]');
 
+        const openUrlInTerminal = (url) => {
+            fetch(url)
+                .then(res => res.text())
+                .then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const content = doc.querySelector('main') || doc.querySelector('article') || doc.body;
+
+                    const terminal = document.getElementById('reading-overlay');
+                    const terminalContent = document.getElementById('reading-content');
+                    if (terminal && terminalContent) {
+                        terminalContent.innerHTML = content.innerHTML;
+                        terminal.classList.remove('hidden');
+                        uiManager.openReadingMode();
+                        // Intercept links within newly loaded content
+                        interceptLinksInContent(terminalContent);
+                    }
+                })
+                .catch(err => console.error('Failed to load content:', err));
+        };
+
         links.forEach(link => {
-            const href = link.getAttribute('href');
+            const rawHref = link.getAttribute('href');
 
             // Skip external links and anchors
-            if (href.startsWith('http') || href.startsWith('#')) return;
+            if (!rawHref || rawHref.startsWith('http') || rawHref.startsWith('#')) return;
 
             link.addEventListener('click', (e) => {
-                e.preventDefault();
+                // Normalize to path
+                let href = rawHref;
+                try {
+                    if (!href.startsWith('/')) {
+                        href = new URL(href, window.location.origin).pathname;
+                    }
+                } catch (_) { /* ignore URL errors */ }
 
-                // Find planet with matching URL
+                // Blog post links: open in terminal (no teleport)
+                if (href.startsWith('/posts/') || href.includes('/posts/')) {
+                    e.preventDefault();
+                    openUrlInTerminal(href);
+                    return;
+                }
+
+                // Try to map to a planet (site pages)
                 const allObjects = galaxyManager.getAllObjects();
                 const targetPlanet = allObjects.find(obj => {
                     if (!obj.userData?.planetData) return false;
@@ -61,6 +151,7 @@ export function createInputSystem(systems) {
                 });
 
                 if (targetPlanet) {
+                    e.preventDefault();
                     uiManager.closeReadingMode();
                     setTimeout(() => {
                         window.dispatchEvent(new CustomEvent('teleportRequest', {
@@ -68,7 +159,9 @@ export function createInputSystem(systems) {
                         }));
                     }, 300);
                 } else {
-                    console.warn(`No planet found for URL: ${href}`);
+                    // Fallback: open the URL in terminal
+                    e.preventDefault();
+                    openUrlInTerminal(href);
                 }
             });
         });
@@ -94,15 +187,57 @@ export function createInputSystem(systems) {
             // Handle galaxy teleportation
             if (target.userData?.galaxyData) {
                 const galaxyName = target.userData.galaxyData.name;
-                const confirmed = confirm(`🚀 PILOT CONFIRMATION\\n\\nTeleport to galaxy "${galaxyName}"?`);
-                if (!confirmed) return;
+                showTeleportConfirm(
+                    'PILOT CONFIRMATION',
+                    `Teleport to galaxy "${galaxyName}"?`,
+                    () => {
+                        target.getWorldPosition(scratchVector);
+                        shipGroup.position.copy(scratchVector);
+                        shipGroup.position.y += 50;
+                        shipControls.setSpeed(0);
+                        triggerTeleportEffect();
+                        audioSystem.playSound('warp');
+                    }
+                );
+                return;
+            }
 
-                target.getWorldPosition(scratchVector);
-                shipGroup.position.copy(scratchVector);
-                shipGroup.position.y += 50;
+            // Handle nebula teleportation (same pattern as galaxy)
+            if (target.userData?.isNebula) {
+                const nebulaName = target.userData.tagName || 'Nebula';
+                showTeleportConfirm(
+                    'PILOT CONFIRMATION',
+                    `Teleport to nebula "${nebulaName}"?`,
+                    () => {
+                        target.getWorldPosition(scratchVector);
+                        shipGroup.position.copy(scratchVector);
+                        shipGroup.position.y += 50;
+                        shipControls.setSpeed(0);
+                        triggerTeleportEffect();
+                        audioSystem.playSound('warp');
+                    }
+                );
+                return;
+            }
+
+            // Handle gas cloud teleportation (like planet): move near cloud center
+            if (target.userData?.isGasCloud) {
+                if (!target.geometry?.boundingSphere) {
+                    try { target.geometry && target.geometry.computeBoundingSphere(); } catch (e) {}
+                }
+                const size = target.geometry?.boundingSphere?.radius || 80000;
+                const offset = new THREE.Vector3(0, 0, size + 20000);
+                offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.random() * Math.PI * 2);
+
+                const center = new THREE.Vector3();
+                target.getWorldPosition(center);
+                shipGroup.position.copy(center).add(offset);
+                shipGroup.lookAt(center);
                 shipControls.setSpeed(0);
                 triggerTeleportEffect();
                 audioSystem.playSound('warp');
+                const name = target.userData.categoryName || 'Gas Cloud';
+                uiManager.updateHUD(0, name);
                 return;
             }
 
@@ -183,6 +318,34 @@ export function createInputSystem(systems) {
                                 terminal.classList.remove('hidden');
                                 uiManager.openReadingMode();
                             }
+                        }
+                    } else if (closest && closest.isGasCloud && closest.cloudData) {
+                        // Build journal list for gas cloud
+                        const terminal = document.getElementById('reading-overlay');
+                        const terminalContent = document.getElementById('reading-content');
+                        const name = closest.obj.userData?.categoryName || 'Gas Cloud';
+                        const posts = [
+                            ...(closest.cloudData.posts || []),
+                            ...Object.values(closest.cloudData.nebulae || {}).flatMap(n => n.posts || [])
+                        ];
+                        const list = posts.map(p => `<li><a href="${p.url}">${p.title || p.name}</a></li>`).join('');
+                        if (terminal && terminalContent) {
+                            terminalContent.innerHTML = `<h2>Journal: ${name}</h2><ul>${list}</ul>`;
+                            terminal.classList.remove('hidden');
+                            uiManager.openReadingMode();
+                            interceptLinksInContent(terminalContent);
+                        }
+                    } else if (closest && closest.isNebula && closest.obj?.userData?.posts) {
+                        const terminal = document.getElementById('reading-overlay');
+                        const terminalContent = document.getElementById('reading-content');
+                        const name = closest.obj.userData.tagName || 'Nebula';
+                        const posts = closest.obj.userData.posts || [];
+                        const list = posts.map(p => `<li><a href="${p.url}">${p.title || p.name}</a></li>`).join('');
+                        if (terminal && terminalContent) {
+                            terminalContent.innerHTML = `<h2>Journal: ${name}</h2><ul>${list}</ul>`;
+                            terminal.classList.remove('hidden');
+                            uiManager.openReadingMode();
+                            interceptLinksInContent(terminalContent);
                         }
                     }
                 }

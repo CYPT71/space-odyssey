@@ -9,6 +9,8 @@
  * @param {Object} systems - All game systems
  * @returns {Object} Physics update functions
  */
+import { getObjectName, getObjectType } from './space-object-utils.js';
+
 export function createPhysicsSystem(systems) {
     const {
         shipControls,
@@ -78,10 +80,14 @@ export function createPhysicsSystem(systems) {
         // Find closest object and update HUD
         const closestObject = galaxyManager.findClosest(shipGroup.position);
         if (closestObject) {
-            const name = closestObject.type === 'planet'
-                ? closestObject.planetData.title || closestObject.planetData.name
-                : `🌌 ${closestObject.galaxyData.name}`;
-            uiManager.hudTarget.textContent = `TARGET: ${name}`;
+            const rawName = getObjectName(closestObject.obj);
+            const type = closestObject.type || getObjectType(closestObject.obj?.userData);
+            const prefixed = type === 'planet' ? `🌍 ${rawName}`
+                : type === 'galaxy' ? `🌌 ${rawName}`
+                : type === 'gasCloud' ? `🌫️ ${rawName}`
+                : type === 'nebula' ? `✨ ${rawName}`
+                : rawName;
+            uiManager.hudTarget.textContent = `TARGET: ${prefixed}`;
         } else {
             uiManager.hudTarget.textContent = 'TARGET: NONE';
         }

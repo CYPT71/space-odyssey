@@ -1,18 +1,18 @@
 /**
  * @fileoverview Unified Space Object Manager
  * @author CYPT71
- * @description Manages both galaxies (pages) and gas clouds (blogs) with shared logic
+ * @description Manages both galaxies (pages) and gas clouds (posts) with shared logic
  * @version 3.0.0
  */
 
 import * as THREE from 'three';
-import { parseFileSystem } from '../galaxy/parser.js';
+import { parseSpaceTree } from '../domain/space-tree.js';
 import { createGalaxy, updateGalaxy } from '../galaxy/renderer.js';
 import { createNavigationSystem } from '../galaxy/navigation.js';
-import { CSS2DObject } from '../infrastructure/css2d-renderer.js';
+import { createPlanetLikeProcedural } from '../entities/planet-factory.js';
 import { createGalaxyTrails, createAnimatedTrails, updateAnimatedTrails } from './galaxy-trails.js';
 import { createBlogGasClouds, updateGasClouds } from './gas-cloud-system.js';
-import { createNebula } from './nebula-system.js';
+import { getObjectType, getDetectionRange } from '../core/space-object-utils.js';
 
 /**
  * Space object types
@@ -38,6 +38,8 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
     let animatedTrails = [];
     const navigation = createNavigationSystem(audioSystem);
 
+    // Type and range helpers come from core utils
+
     /**
      * Hash string to color
      * @param {string} str - String to hash
@@ -61,35 +63,20 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
         if (!files) return [];
         return files.map((file, i) => {
             const angle = (i / files.length) * Math.PI * 2;
-            const radius = 2000000 + Math.random() * 6000000;
-            const height = (Math.random() - 0.5) * 1000000;
-            const size = 50000 + Math.random() * 70000;
+            const radius = 3000000 + Math.random() * 7000000;
+            const height = (Math.random() - 0.5) * 1500000;
+            const displayTitle = file.tiitle || file.title || file.name;
 
-            const geometry = new THREE.IcosahedronGeometry(size, 3);
-            const material = new THREE.MeshStandardMaterial({
-                color: 0x00F0FF,
-                emissive: 0x00F0FF,
-                emissiveIntensity: 0.6,
-                metalness: 0.4,
-                roughness: 0.6
-            });
-
-            const mesh = new THREE.Mesh(geometry, material);
+            const mesh = createPlanetLikeProcedural({ name: displayTitle, url: file.url });
             mesh.position.set(
                 Math.cos(angle) * radius + (Math.random() - 0.5) * 500000,
                 height,
                 Math.sin(angle) * radius + (Math.random() - 0.5) * 500000
             );
 
-            const div = document.createElement('div');
-            div.className = 'planet-label';
-            div.textContent = file.title || file.name;
-            const label = new CSS2DObject(div);
-            label.position.set(0, size + 10000, 0);
-            mesh.add(label);
-
             mesh.userData = {
-                planetData: file,
+                ...mesh.userData,
+                planetData: { ...file, title: displayTitle },
                 objectType: OBJECT_TYPES.PLANET
             };
 
@@ -107,7 +94,7 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
 
         return galaxyArray.map((galaxyData, i) => {
             const angle = (i / galaxyArray.length) * Math.PI * 2;
-            const radius = 800000;
+            const radius = 3000000; // galaxies further apart to prevent overlaps
 
             const galaxy = createGalaxy(galaxyData, {
                 x: Math.cos(angle) * radius,
@@ -126,52 +113,22 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
                 }
             }
 
-            galaxy.userData = { objectType: OBJECT_TYPES.GALAXY };
+            // Mark the underlying Three.js group as a galaxy for lookups/HUD
+            if (galaxy.group && galaxy.group.userData) {
+                galaxy.group.userData.objectType = OBJECT_TYPES.GALAXY;
+            }
             return galaxy;
         });
     };
 
     /**
-     * Creates gas clouds from blog data
-     * @param {Object} blogsData - Blogs data
-     * @returns {Array} Gas cloud objects
-     */
+ * Creates gas clouds from blog data
+ * @param {Object} blogsData - blogs data
+ * @returns {Array} Gas cloud objects
+ */
     const createGasCloudsFromBlogs = (blogsData) => {
-        // Use the exported function from gas-cloud-system.js
-        const clouds = createBlogGasClouds(scene, blogsData);
-
-        // Also create nebulae synchronously
-        const cloudNames = Object.keys(blogsData.gasClouds);
-        cloudNames.forEach((cloudName, index) => {
-            const cloudData = blogsData.gasClouds[cloudName];
-
-            // Position for this gas cloud
-            const angle = (index / cloudNames.length) * Math.PI * 2;
-            const radius = 1500000;
-            const center = new THREE.Vector3(
-                Math.cos(angle) * radius,
-                (Math.random() - 0.5) * 200000,
-                Math.sin(angle) * radius
-            );
-
-            // Create nebulae within gas cloud
-            Object.keys(cloudData.nebulae).forEach((nebulaName, nebulaIndex) => {
-                const nebulaData = cloudData.nebulae[nebulaName];
-                const nebulaAngle = (nebulaIndex / Object.keys(cloudData.nebulae).length) * Math.PI * 2;
-                const nebulaRadius = 50000;
-                const nebulaCenter = new THREE.Vector3(
-                    center.x + Math.cos(nebulaAngle) * nebulaRadius,
-                    center.y,
-                    center.z + Math.sin(nebulaAngle) * nebulaRadius
-                );
-
-                const nebula = createNebula(scene, nebulaCenter, nebulaName, nebulaData.posts.length);
-                nebula.userData.parentGasCloud = cloudName;
-                console.log(`✨ Created nebula "${nebulaName}" in gas cloud "${cloudName}"`);
-            });
-        });
-
-        return clouds;
+        // Gas-cloud system now creates clouds and nebulae
+        return createBlogGasClouds(scene, blogsData);
     };
 
     /**
@@ -185,32 +142,53 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
 
         console.log('🚀 Initializing space objects...');
 
-        // Parse file system
-        spaceTree = parseFileSystem(window.fileSystem);
-        navigation.setGalaxyTree(spaceTree);
+        const populateFromTree = (tree) => {
+            spaceTree = tree;
+            navigation.setGalaxyTree(spaceTree);
+            console.log('📊 Parsed space tree:', spaceTree);
 
-        console.log('📊 Parsed space tree:', spaceTree);
+            // Create root planets
+            rootPlanets = createRootPlanets(spaceTree.root.files);
+            rootPlanets.forEach(planet => scene.add(planet));
+            console.log(`🌍 Created ${rootPlanets.length} root planets`);
 
-        // Create root planets
-        rootPlanets = createRootPlanets(spaceTree.root.files);
-        rootPlanets.forEach(planet => scene.add(planet));
-        console.log(`🌍 Created ${rootPlanets.length} root planets`);
+            // Create galaxies (from /)
+            galaxies = createGalaxies(spaceTree.root.galaxies);
+            galaxies.forEach(galaxy => scene.add(galaxy.group));
+            console.log(`🌌 Created ${galaxies.length} galaxies`);
 
-        // Create galaxies (from /)
-        galaxies = createGalaxies(spaceTree.root.galaxies);
-        galaxies.forEach(galaxy => scene.add(galaxy.group));
-        console.log(`🌌 Created ${galaxies.length} galaxies`);
+            // Create gas clouds (from /posts/)
+            if (spaceTree.blogs && Object.keys(spaceTree.blogs.gasClouds).length > 0) {
+                console.log(`🌫️ Creating gas clouds from blogs:`, spaceTree.blogs);
+                gasClouds = createGasCloudsFromBlogs(spaceTree.blogs);
+                console.log(`🌫️ Created ${gasClouds.length} gas clouds`);
+            } else {
+                console.log('⚠️ No blog data found for gas clouds');
+            }
 
-        // Create gas clouds (from /posts/)
-        if (spaceTree.blogs && Object.keys(spaceTree.blogs.gasClouds).length > 0) {
-            console.log(`🌫️ Creating gas clouds from blogs:`, spaceTree.blogs);
-            gasClouds = createGasCloudsFromBlogs(spaceTree.blogs);
-            console.log(`🌫️ Created ${gasClouds.length} gas clouds`);
-        } else {
-            console.log('⚠️ No blog data found for gas clouds');
+            console.log(`✨ Total: ${galaxies.length} galaxies, ${gasClouds.length} gas clouds`);
+        };
+
+        // Optional: offload parse to Web Worker for responsiveness
+        try {
+            if (window.Worker) {
+                const worker = new Worker(new URL('../workers/parse-worker.js', import.meta.url), { type: 'module' });
+                worker.onmessage = (e) => {
+                    console.log('🧵 Worker parsed tree');
+                    populateFromTree(e.data);
+                };
+                worker.onerror = (err) => {
+                    console.error('Parse worker failed, falling back:', err);
+                    populateFromTree(parseSpaceTree(window.fileSystem));
+                };
+                worker.postMessage({ files: window.fileSystem });
+            } else {
+                populateFromTree(parseSpaceTree(window.fileSystem));
+            }
+        } catch (e) {
+            console.warn('Worker parse unavailable, using main thread:', e);
+            populateFromTree(parseSpaceTree(window.fileSystem));
         }
-
-        console.log(`✨ Total: ${galaxies.length} galaxies, ${gasClouds.length} gas clouds`);
     };
 
     /**
@@ -236,22 +214,20 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
     const getAllObjects = () => {
         const all = [...rootPlanets];
 
+        // Collect all planet meshes contained in a galaxy group, including
+        // direct children and any nested sub-galaxies. We don't rely on
+        // a "galaxy.planets" array because the renderer currently only
+        // returns { group, particles }.
         const collectPlanets = (galaxy) => {
-            if (galaxy.planets) all.push(...galaxy.planets);
-
-            // Check for sub-galaxies in the group's children
-            galaxy.group.children.forEach(child => {
-                if (child.userData?.isGalaxy) {
-                    // It's a sub-galaxy group, we need to find its planets
-                    // The renderer structure wraps sub-galaxies in groups
-                    // We can traverse or check userData
-                    // Ideally, the renderer should expose sub-galaxy objects in a structured way
-                    // For now, let's traverse the group to find planets
-                    child.traverse(grandChild => {
-                        if (grandChild.userData?.objectType === OBJECT_TYPES.PLANET) {
-                            all.push(grandChild);
-                        }
-                    });
+            // Traverse the entire galaxy group and add anything that carries
+            // planet metadata. This is robust regardless of nesting depth.
+            galaxy.group.traverse(node => {
+                const ud = node.userData || {};
+                if (ud.planetData) {
+                    all.push(node);
+                }
+                if (ud.isGalaxy) {
+                    all.push(node);
                 }
             });
         };
@@ -265,9 +241,8 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
 
         // Add nebulae from scene
         scene.traverse(obj => {
-            if (obj.userData?.isNebula) {
-                all.push(obj);
-            }
+            const ud = obj.userData || {};
+            if (ud.isNebula) all.push(obj);
         });
 
         return all;
@@ -285,20 +260,25 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
         const scratchPos = new THREE.Vector3();
 
         all.forEach(obj => {
-            if (!obj.userData.planetData && !obj.userData.galaxyData && !obj.userData.cloudData) return;
+            const ud = obj.userData || {};
+            const type = getObjectType(ud);
+            if (type === 'unknown') return;
 
             obj.getWorldPosition(scratchPos);
             const dist = position.distanceTo(scratchPos);
 
-            if (dist < minDist && dist < 500000) {
+            const range = getDetectionRange(type);
+            if (dist < range && dist < minDist) {
                 minDist = dist;
                 closest = {
                     distance: dist,
-                    planetData: obj.userData.planetData,
-                    galaxyData: obj.userData.galaxyData,
-                    cloudData: obj.userData.cloudData,
-                    type: obj.userData.objectType || (obj.userData.planetData ? 'planet' : 'galaxy'),
-                    obj: obj
+                    planetData: ud.planetData,
+                    galaxyData: ud.galaxyData,
+                    cloudData: ud.cloudData,
+                    isGasCloud: ud.isGasCloud,
+                    isNebula: ud.isNebula,
+                    type,
+                    obj
                 };
             }
         });
@@ -311,6 +291,7 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
         update,
         getAllObjects,
         findClosest,
+        getTree: () => spaceTree,
         getGalaxies: () => galaxies,
         getGasClouds: () => gasClouds
     };

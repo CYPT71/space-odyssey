@@ -41,9 +41,11 @@ exclude:
 defaults:
   - scope:
       type: pages
+      path: /:path
     values:
       layout: "default"
   - scope:
       type: posts
+      path: /posts/:path
     values:
       layout: "default"

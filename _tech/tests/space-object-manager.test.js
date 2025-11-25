@@ -13,7 +13,7 @@ jest.mock('../../theme/assets/js/galaxy/parser.js', () => ({
             files: [],
             galaxies: {}
         },
-        blogs: {
+        posts: {
             gasClouds: {}
         }
     }))
@@ -147,7 +147,7 @@ describe('Space Object Manager - Gas Clouds', () => {
         manager = createSpaceObjectManager(mockScene, {});
     });
 
-    test('should create gas clouds from blogs', () => {
+    test('should create gas clouds from posts', () => {
         manager.initialize();
         const gasClouds = manager.getGasClouds();
         expect(gasClouds.length).toBeGreaterThan(0);

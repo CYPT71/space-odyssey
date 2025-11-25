@@ -56,8 +56,8 @@ describe('Galaxy Parser', () => {
 
             const tree = parseFileSystem(files);
 
-            expect(tree.root.galaxies.blog).toBeDefined();
-            expect(tree.root.galaxies.blog.files).toHaveLength(2);
+            expect(tree.root.galaxies.posts).toBeDefined();
+            expect(tree.root.galaxies.posts.files).toHaveLength(2);
         });
 
         test('should ignore files outside /', () => {
@@ -80,8 +80,8 @@ describe('Galaxy Parser', () => {
 
             const tree = parseFileSystem(files);
 
-            expect(tree.root.galaxies.blog).toBeDefined();
-            expect(tree.root.galaxies.blog.subGalaxies['2024']).toBeDefined();
+            expect(tree.root.galaxies.posts).toBeDefined();
+            expect(tree.root.galaxies.posts.subGalaxies['2024']).toBeDefined();
         });
 
         test('should return empty tree for no valid files', () => {

@@ -184,6 +184,30 @@
   <!-- WebGL Container -->
   <div id="webgl-container"></div>
 
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="hidden">
+    <div class="loading-box">
+      <div class="spinner"></div>
+      <h3>INITIALIZING UNIVERSE</h3>
+      <p>Preparing galaxies, clouds and navigation…</p>
+    </div>
+  </div>
+
+  <!-- Tutorial Overlay -->
+  <div id="tutorial-overlay" class="hidden">
+    <div class="tutorial-backdrop"></div>
+    <div class="tutorial-highlight"></div>
+    <div class="tutorial-box">
+      <h3 id="tutorial-title">Welcome</h3>
+      <p id="tutorial-text">Use the controls to navigate.</p>
+      <div class="tutorial-actions">
+        <button id="tutorial-prev">◀ Prev</button>
+        <button id="tutorial-next">Next ▶</button>
+        <button id="tutorial-close">✕ Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Reading Overlay (Terminal) -->
   <!-- Reading Overlay (Terminal) -->
   <div id="reading-overlay">
@@ -207,6 +231,7 @@
       {% for page in site.pages %}
     {
       title: "{{ page.title | default: page.name | escape }}",
+      tiitle: "{{ page.tiitle | default: '' | escape }}",
         url: "{{ page.url | relative_url }}",
           name: "{{ page.name | escape }}",
             path: "{{ page.path | escape }}",
@@ -216,6 +241,7 @@
     {% for post in site.posts %}
     {
       title: "{{ post.title | default: post.name | escape }}",
+      tiitle: "{{ post.tiitle | default: '' | escape }}",
         url: "{{ post.url | relative_url }}",
           name: "{{ post.name | escape }}",
             path: "{{ post.path | escape }}",
@@ -280,6 +306,7 @@
   </script>
 
   <script type="module" src="{{ "/theme/assets/js/space-scene.js" | relative_url }}"></script>
+  <script type="module" src="{{ "/theme/assets/js/systems/tutorial.js" | relative_url }}"></script>
 
 </body>
 

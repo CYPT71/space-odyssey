@@ -1,0 +1,49 @@
+# Site meta
+title: "CYPT71 - Cosmic Engineer"
+email: contact@cypride.dev
+description: "Deep Space Observatory Terminal - Portfolio & Projects"
+
+# URLs
+url: ""
+baseurl: ""
+
+# Theme configuration (paths relative to repository root)
+layouts_dir: theme/_layouts
+includes_dir: theme/_includes
+sass_dir: theme/assets/css
+
+# Markup
+markdown: kramdown
+highlighter: rouge
+
+# Jekyll collections configuration
+collections_dir: content
+collections:
+  pages:
+    output: true
+    permalink: /:path
+  posts:
+    output: true
+    permalink: /posts/:path
+
+# Exclude noisy build/dev files
+exclude:
+  - node_modules
+  - vendor
+  - .jekyll-cache
+  - .ruby-lsp
+  - .DS_Store
+  - README.md
+  - Gemfile
+  - Gemfile.lock
+
+# Defaults for collections (optional but explicit)
+defaults:
+  - scope:
+      type: pages
+    values:
+      layout: "default"
+  - scope:
+      type: posts
+    values:
+      layout: "default"

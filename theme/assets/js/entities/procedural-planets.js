@@ -1,0 +1,99 @@
+/**
+ * @fileoverview Procedural Planet Generator
+ * @author CYPT71
+ * @description Creates random planets to populate the space scene
+ */
+
+import * as THREE from 'three';
+import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { addAtmosphere } from '../systems/atmosphere-system.js';
+
+// Planet name generators
+const prefixes = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Theta', 'Omega'];
+const suffixes = ['Prime', 'Secundus', 'Tertius', 'Major', 'Minor', 'Proxima', 'Ultima'];
+
+/**
+ * Creates procedural planets with atmospheres
+ * @param {number} count - Number of planets to generate
+ * @returns {Array<THREE.Mesh>} Array of planet meshes
+ */
+export function createProceduralPlanets(count = 100) {
+    const planets = [];
+
+    for (let i = 0; i < count; i++) {
+        // Random planet size (MUCH LARGER - 100k to 500k units)
+        const size = 100000 + Math.random() * 400000;
+
+        // Random position in FULL 3D SPACE (not just a plane)
+        // Extended galaxy distances: 10M to 100M units
+        const radius = 10000000 + Math.random() * 90000000;
+        const theta = Math.random() * Math.PI * 2; // Full horizontal rotation
+        const phi = Math.acos(2 * Math.random() - 1); // Full vertical distribution (spherical)
+
+        // Random color
+        const color = new THREE.Color();
+        color.setHSL(Math.random(), 0.5 + Math.random() * 0.5, 0.3 + Math.random() * 0.4);
+
+        // Create geometry and material
+        const geometry = new THREE.SphereGeometry(1, 32, 32);
+        const material = new THREE.MeshStandardMaterial({
+            color: color,
+            roughness: 0.8,
+            metalness: 0.2
+        });
+
+        // Create mesh and set size
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.scale.set(size, size, size);
+
+        // Position planet in full 3D space
+        mesh.position.set(
+            radius * Math.sin(phi) * Math.cos(theta),
+            radius * Math.sin(phi) * Math.sin(theta),
+            radius * Math.cos(phi)
+        );
+
+        // === ADD ATMOSPHERE (JS CORE STYLE) ===
+        // Randomize atmosphere properties
+        const hasAtmosphere = Math.random() > 0.2; // 80% chance
+        if (hasAtmosphere) {
+            addAtmosphere(mesh, {
+                color: new THREE.Color().setHSL(Math.random(), 0.8, 0.5), // Random vivid color
+                intensity: 0.5 + Math.random() * 0.5,
+                power: 3.0 + Math.random() * 2.0,
+                size: 1.1 + Math.random() * 0.1 // 1.1x to 1.2x planet size
+            });
+        }
+
+        // Generate random name
+        const randomPrefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+        const randomNumber = Math.floor(Math.random() * 1000);
+        const randomSuffix = suffixes[Math.floor(Math.random() * suffixes.length)];
+        const name = `${randomPrefix}-${randomNumber} ${randomSuffix}`;
+
+        // Add label above planet
+        const div = document.createElement('div');
+        div.className = 'planet-label';
+        div.textContent = name;
+        const label = new CSS2DObject(div);
+        label.position.set(0, size * 1.2, 0);
+        mesh.add(label);
+
+        // Add rotation speed (smaller planets rotate faster)
+        const rotationSpeed = (1 / size) * 0.0001;
+
+        // Store planet data
+        mesh.userData = {
+            isProcedural: true,
+            rotationSpeed: rotationSpeed,
+            planetData: {
+                name: name,
+                description: "Procedural Planet. No data available."
+            }
+        };
+
+        planets.push(mesh);
+    }
+
+    return planets;
+}

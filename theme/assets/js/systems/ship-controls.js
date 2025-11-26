@@ -143,6 +143,9 @@ const applyRotationalInertia = (state, controls) => {
     // Roll (Manual barrel rolls)
     if (isKeyPressed(state, controls.rollLeft)) state.rotVel.z += ACCELERATION;
     if (isKeyPressed(state, controls.rollRight)) state.rotVel.z -= ACCELERATION;
+    // Secondary roll via strafe keys for full rotations with A/E
+    if (isKeyPressed(state, controls.strafeLeft)) state.rotVel.z += ACCELERATION * 0.6;
+    if (isKeyPressed(state, controls.strafeRight)) state.rotVel.z -= ACCELERATION * 0.6;
 
     // Apply decay
     state.rotVel.x *= DECAY;

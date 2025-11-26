@@ -347,19 +347,19 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
         const dist = position.distanceTo(scratchPos);
         const range = getDetectionRange(type);
 
-        if (dist < range) {
-            return {
-                distance: dist,
-                planetData: ud.planetData,
-                galaxyData: ud.galaxyData,
-                cloudData: ud.cloudData,
-                isGasCloud: ud.isGasCloud,
-                isNebula: ud.isNebula,
-                type,
-                obj: closestObj
-            };
-        }
-        return null;
+        // Return the closest object even if it's slightly outside range,
+        // so HUD/targeting never goes blank in sparse scenes.
+        return {
+            distance: dist,
+            planetData: ud.planetData,
+            galaxyData: ud.galaxyData,
+            cloudData: ud.cloudData,
+            isGasCloud: ud.isGasCloud,
+            isNebula: ud.isNebula,
+            type,
+            obj: closestObj,
+            inRange: range ? dist < range : true
+        };
     };
 
     return {

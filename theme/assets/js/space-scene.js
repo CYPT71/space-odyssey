@@ -100,11 +100,14 @@ const initGalaxy = () => {
         hideLoading();
         window.dispatchEvent(new CustomEvent('universeReady'));
     } else {
-        console.log('⏳ Waiting for file system...');
+        fsPollAttempts += 1;
+        const pct = Math.min(99, Math.floor((fsPollAttempts / 300) * 100)); // ~30s to 99%
+        console.log(`⏳ Waiting for file system... ${pct}%`);
         setTimeout(initGalaxy, 100);
     }
 };
 
+let fsPollAttempts = 0;
 initGalaxy();
 
 // ============================================================

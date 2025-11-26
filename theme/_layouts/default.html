@@ -263,7 +263,7 @@
 
   <script>
     // Expose base URL prefix (relative_url aware) so modules can strip/restore when normalizing paths
-    window.siteBase = "{{ '/' | relative_url }}".replace(/\\/+$/, '');
+    window.siteBase = ("{{ '/' | relative_url }}").replace(/\/+$/, '');
 
     // Inject complete file system for galaxy generation
     // Inject complete file system for galaxy generation

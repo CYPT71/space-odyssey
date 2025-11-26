@@ -6,6 +6,7 @@
 
 import * as THREE from 'three';
 import { loadControls as loadControlsShared } from '../config/controls.js';
+import { getObjectType, getDetectionRange } from './space-object-utils.js';
 
 /**
  * Creates the input handling system

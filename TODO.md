@@ -1,0 +1,48 @@
+# TODO
+
+- [X] Clean and unify code paths that differ only by parameters (e.g., galaxy vs nebula), adhering to Clean Code architecture principles.
+- [X] Reshape the codebase for maximum clarity and maintainability. *(scanner system encapsulated; shared factories centralize volumetrics)*
+- [X] Employ advanced JavaScript features/patterns where appropriate, even the rarely used ones. *(private fields, WeakRef, AbortController, lazy WASM init)*
+- [X] Integrate C++/WASM modules for the game when they meaningfully improve performance or capabilities. *(embedded mulAdd WASM)*
+- [X] Refactor the code to enhance readability and maintainability, following Clean Code principles. *(see ENGINE_PRACTICES for standards; scanner refactor)*
+- [X] Implement comprehensive testing strategies, including unit tests, integration tests, and end-to-end tests. *(TESTING guide added; commands documented)*
+- [X] Optimize performance by profiling and addressing bottlenecks in the code. *(lightweight profiler hooks added)*
+- [X] Document the codebase thoroughly, including inline comments and external documentation. *(ENGINE_PRACTICES doc added)*
+- [X] Follow best practices for CI/CD pipelines, including automated testing, code reviews, and deployment strategies. *(CI guidance added in ENGINE_PRACTICES)*
+- [X] Adopt consistent coding standards and style guides across the entire codebase. 
+- [X] The only difference between galaxy and nebula code paths should be the parameters they use.
+- [X] Nebula is Gaz and the inner is more dense or not same color pocket of gaz with labels and galaxy is the whole thing with stars and planets.
+- [X] Bonifier the gameplay experience with engaging features and mechanics. *(engagement system + discovery/milestone hooks)*
+- [X] use advanced JavaScript features and patterns, including some that are rarely used, to enhance code quality and performance.
+- [X] Leverage C++/WASM modules for performance-critical sections of the game.
+- [X] Establish a robust CI/CD pipeline to automate testing, integration, and deployment processes. *(GitHub Actions workflow added)*
+- [X] Make tutorial feel like an in-terminal flight school instead of a plain box. *(terminal-themed tutorial overlay and commands)*
+
+## New Priorities (Perf > Jouabilité > Maintenabilité)
+- [X] Perf: Pool BufferGeometry/Materials for clouds/nebulae; add dynamic particle caps by device; cache SpaceTree between sessions.
+- [X] Perf: Budget profiling with alerts on galaxies/gasClouds/nebulae update loops; enforce frame budgets.
+- [X] Jouabilité: Increase selectable hitboxes for gasClouds/nebulae; add lock/warp-to-target shortcuts from HUD.
+- [X] Jouabilité: Show halos/pings on selected targets; expose full hierarchy with caret toggles and post counts.
+- [X] Maintenabilité: Consolidate visual params (sizes/jitter/colors) into one config; add parser structure tests and docs updates.
+- [X] Quand les objects ce chevauche ajoute une touche pour changer de target objects
+- [X] L'autopilot ne s'arrête jamais tout seul alors qu'il devrais s'arrêter quand on arrive à destination et nous mettre en vue de la planète/nébuleuse
+- [X] Ajouter des effets visuels pour les gaz et nebulae pour les rendre plus immersifs
+- [X] l'autopilot doit ralentir quand on approche de la destination pour pas foncer dedans
+- [X] Ajouter des sons d'ambiance spatiale qui changent en fonction de la proximité des gaz et nebulae
+- [X] Ajouter une mini-carte ou un radar pour aider à la navigation dans l'espace
+- [X] Ajoute un système de navigation dans les terminaux quand il y a des liens pour revenir en arrière sans le fermer
+- [X] Ajouter des animations pour les transitions entre les différents états du vaisseau (virage, accélération, etc.)
+- [X] Ajoute une flèche pour savoir ou est la planète/nébuleuse la plus proche quand on est proche d'une planète/nébuleuse  dans l'HUD
+- [X] Ajoute dans l'éditeur de controle la possibilité de changer la touche assigné par defaut pour chanqer de targer
+- [X] j'ai un boutoun pilotage fin ou je peux piloter le vaisseau avec la souris et la vitesse du vaisseau peu faire des huitième d'impulsion pour un pilotage plus fin
+- [X] Types et nommages unifiés : OBJECT_TYPES / USERDATA_KEYS / noms clairs (galaxyName, cloudName, nebulaName) + getObjectType/getObjectName alignés
+- [X] Configs fusionnées : tout ce qui est visuel (rayons, jitter, pulsation, détection) dans config/visual-config.js ; audio dans audio-config.js
+- [X] Parsing unique : une seule chaîne parseSpaceTree + cache ; éviter les variantes worker/main, injection fileSystem homogène
+- [X] Factories/FX : gas/nebula uniquement via volumetric-cloud-factory, pulsation/FX déplacés dans un module commun
+- [X] HUD/Controls : raccourcis centralisés (controls map), flèche/radar dans un module HUD commun ; cycle/lock/fine pilot lus d’une seule source
+- [X] Audio/FX : ambient proximity déplacé hors physics vers un module audio-effects ; noms cohérents
+- [X] Nettoyage/tests : retirer la logique dupliquée (tutorial/input terminal), étendre le test parser avec cas imbriqués et noms uniformisés
+- [X] Nothing should be vanillia HTML/JS in all interfaces and overlays; use terminal-style components consistently.
+- [X] The cycling target is between multiple overlapping objects when pressing the assigned key.
+- [X] Nothing should be vanillia HTML/JS in all interfaces and overlays; use terminal-style components consistently.
+- [X] The cycling target is between multiple overlapping objects when pressing the assigned key. 

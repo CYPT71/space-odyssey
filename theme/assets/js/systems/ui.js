@@ -118,9 +118,9 @@ export const createUIManager = (audioSystem) => {
                 } else if (type === 'galaxy') {
                     title = closestPlanet.galaxyData.name;
                 } else if (type === 'gasCloud') {
-                    title = `🌫️ ${closestPlanet.obj?.userData?.categoryName || 'Gas Cloud'}`;
+                    title = `🌫️ ${closestPlanet.obj?.userData?.cloudName || closestPlanet.obj?.userData?.categoryName || 'Gas Cloud'}`;
                 } else if (type === 'nebula') {
-                    title = `✨ ${closestPlanet.obj?.userData?.tagName || 'Nebula'}`;
+                    title = `✨ ${closestPlanet.obj?.userData?.nebulaName || closestPlanet.obj?.userData?.tagName || 'Nebula'}`;
                 }
 
                 // Distance for point-like targets (planets, nebulae, clouds)

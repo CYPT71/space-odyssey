@@ -6,7 +6,9 @@
 
 import * as THREE from 'three';
 import { createNebula } from './nebula-system.js';
-import { CSS2DObject } from '../infrastructure/css2d-renderer.js';
+import { createVolumetricCloud, hashStringToColor } from './volumetric-cloud-factory.js';
+import { GAS_CLOUD_VISUAL } from '../config/visual-config.js';
+import { applyPulseScale } from '../effects/visual-effects.js';
 
 /**
  * Creates a gas cloud (volumetric particle system) for a posts category
@@ -16,118 +18,49 @@ import { CSS2DObject } from '../infrastructure/css2d-renderer.js';
  * @param {number} postCount - Number of posts
  * @returns {THREE.Points} The gas cloud
  */
-export function createGasCloud(scene, center, categoryName, postCount) {
-    const particleCount = Math.min(postCount * 500, 5000); // More particles than nebulae
-    const radius = 100000 + (postCount * 20000); // Larger clouds for more posts
-
-    const geometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(particleCount * 3);
-    const colors = new Float32Array(particleCount * 3);
-    const sizes = new Float32Array(particleCount);
-
-    // Generate category-specific color
-    const cloudColor = hashStringToColor(categoryName);
-
-    // Create volumetric distribution (more dense at center)
-    for (let i = 0; i < particleCount; i++) {
-        const i3 = i * 3;
-
-        // Spherical distribution with density falloff
-        const theta = Math.random() * Math.PI * 2;
-        const phi = Math.acos(2 * Math.random() - 1);
-        const r = radius * Math.pow(Math.random(), 0.5); // Square root for volume distribution
-
-        // Local space positions; we position the whole cloud at 'center'
-        positions[i3] = r * Math.sin(phi) * Math.cos(theta);
-        positions[i3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-        positions[i3 + 2] = r * Math.cos(phi);
-
-        // Color with variation (more variation at edges)
-        const distRatio = r / radius;
+const GAS_CLOUD_CONFIG = Object.freeze({
+    particleMultiplier: GAS_CLOUD_VISUAL.particleMultiplier,
+    particleCap: GAS_CLOUD_VISUAL.particleCap,
+    baseRadius: GAS_CLOUD_VISUAL.baseRadius,
+    radiusPerUnit: GAS_CLOUD_VISUAL.radiusPerUnit,
+    distributionPower: 0.5,
+    baseColorFn: (name) => hashStringToColor(name),
+    colorJitterFn: (baseColor, distRatio, scratch) => {
         const variation = distRatio * 0.3;
-        colors[i3] = cloudColor.r + (Math.random() - 0.5) * variation;
-        colors[i3 + 1] = cloudColor.g + (Math.random() - 0.5) * variation;
-        colors[i3 + 2] = cloudColor.b + (Math.random() - 0.5) * variation;
-
-        // Varying particle sizes (larger at center)
-        sizes[i] = 800 * (1 - distRatio * 0.5);
-    }
-
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-
-    const material = new THREE.PointsMaterial({
+        scratch.copy(baseColor);
+        scratch.r += (Math.random() - 0.5) * variation;
+        scratch.g += (Math.random() - 0.5) * variation;
+        scratch.b += (Math.random() - 0.5) * variation;
+        return scratch;
+    },
+    sizeFn: (distRatio) => 800 * (1 - distRatio * 0.5),
+    material: {
         size: 800,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.4,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        sizeAttenuation: true
+        opacity: 0.4
+    },
+    labelClass: 'planet-label',
+    labelTextFn: (name) => name.toUpperCase(),
+    labelHeightFn: () => 20000,
+    spaceType: 'nebula'
+});
+
+export function createGasCloud(scene, center, categoryName, postCount) {
+    const gasCloud = createVolumetricCloud({
+        center,
+        name: categoryName,
+        count: postCount,
+        config: GAS_CLOUD_CONFIG,
+        extraUserData: {
+            isGasCloud: true,
+            isGalaxy: false,
+            spaceType: 'nebula',
+            cloudName: categoryName,
+            postCount
+        }
     });
-
-    const gasCloud = new THREE.Points(geometry, material);
-    gasCloud.position.copy(center);
-
-    gasCloud.userData = {
-        isGasCloud: true,
-        categoryName: categoryName,
-        postCount: postCount,
-        center: center.clone()
-    };
-
-    // Label for gas cloud
-    const div = document.createElement('div');
-    div.className = 'planet-label';
-    div.textContent = categoryName.toUpperCase();
-    const label = new CSS2DObject(div);
-    label.position.set(0, 20000, 0);
-    gasCloud.add(label);
 
     scene.add(gasCloud);
     return gasCloud;
-}
-
-/**
- * Hash string to color
- * @param {string} str - String to hash
- * @returns {Object} RGB color
- */
-function hashStringToColor(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-
-    const h = (hash % 360) / 360;
-    const s = 0.6;
-    const l = 0.5;
-
-    // HSL to RGB
-    const hslToRgb = (h, s, l) => {
-        let r, g, b;
-        if (s === 0) {
-            r = g = b = l;
-        } else {
-            const hue2rgb = (p, q, t) => {
-                if (t < 0) t += 1;
-                if (t > 1) t -= 1;
-                if (t < 1 / 6) return p + (q - p) * 6 * t;
-                if (t < 1 / 2) return q;
-                if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-                return p;
-            };
-            const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-            const p = 2 * l - q;
-            r = hue2rgb(p, q, h + 1 / 3);
-            g = hue2rgb(p, q, h);
-            b = hue2rgb(p, q, h - 1 / 3);
-        }
-        return { r, g, b };
-    };
-
-    return hslToRgb(h, s, l);
 }
 
 /**
@@ -139,6 +72,12 @@ function hashStringToColor(str) {
 export function createPostsGasClouds(scene, postsData) {
     const gasClouds = [];
     const cloudNames = Object.keys(postsData.gasClouds);
+
+    const collectPostsDeep = (node) => {
+        const own = Array.isArray(node.posts) ? node.posts : [];
+        const children = Object.values(node.nebulae || {}).flatMap(collectPostsDeep);
+        return own.concat(children);
+    };
 
 
     cloudNames.forEach((cloudName, index) => {
@@ -170,14 +109,19 @@ export function createPostsGasClouds(scene, postsData) {
             level = 0,
             parentColor = null
         ) => {
-            // Angle & radius for this node relative to its parent center
-            const angle = (index / Math.max(count, 1)) * Math.PI * 2;
-            const radius = 50000 * Math.max(1, 1.2 - level * 0.1);
+            // Spread nodes using golden-angle to avoid overlap; randomize radial offset for inner nebulae
+            const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+            const angle = index * goldenAngle;
+            const baseRadius = 160000 * (1 + level * 0.8);
+            const jitter = 40000 * Math.random();
+            const radius = baseRadius + jitter;
+            const vertical = (Math.random() - 0.5) * 50000 * Math.max(1, 1 + level * 0.3);
 
+            // Position relative to parent center (local offset)
             const centerPos = new THREE.Vector3(
-                parentCenter.x + Math.cos(angle) * radius,
-                parentCenter.y,
-                parentCenter.z + Math.sin(angle) * radius
+                Math.cos(angle) * radius,
+                vertical,
+                Math.sin(angle) * radius
             );
 
             // Create a group for this nebula node
@@ -189,12 +133,12 @@ export function createPostsGasClouds(scene, postsData) {
                 scene,
                 new THREE.Vector3(0, 0, 0), // local position inside the group
                 nebulaNode.name,
-                (nebulaNode.posts || []).length,
+                collectPostsDeep(nebulaNode).length,
                 parentColor
             );
 
-            neb.userData.parentGasCloud = nebulaNode.name; // or whatever you actually want here
-            neb.userData.posts = nebulaNode.posts || [];
+            neb.userData.parentGasCloud = cloudName;
+            neb.userData.posts = collectPostsDeep(nebulaNode);
 
             if (neb.userData.posts.length > 0 && typeof neb.visualizePosts === "function") {
                 neb.visualizePosts(neb.userData.posts);
@@ -226,10 +170,10 @@ export function createPostsGasClouds(scene, postsData) {
         const topNebulae = Object.values(cloudData.nebulae);
         if (topNebulae.length === 0 && cloudData.posts?.length) {
             // Default single cluster
-            const neb = createNebula(scene, center.clone(), 'cluster', cloudData.posts.length);
+            const neb = createNebula(scene, new THREE.Vector3(0, 0, 0), 'cluster', cloudData.posts.length);
             neb.userData.parentGasCloud = cloudName;
             neb.userData.posts = cloudData.posts;
-            gasCloud.add(neb);
+            gasCloud.add(neb); // attach at cloud origin
         } else {
             topNebulae.forEach((node, i) => createNebulaTree(gasCloud, center, node, i, topNebulae.length, 0));
         }
@@ -253,6 +197,7 @@ export function updateGasClouds(gasClouds, delta) {
             // Pulsing opacity
             const time = Date.now() * 0.001;
             cloud.material.opacity = 0.3 + Math.sin(time) * 0.1;
+            applyPulseScale(cloud, time, 0.6, 0.05);
         }
     });
 }

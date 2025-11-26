@@ -19,8 +19,10 @@ import { createShipControls } from './systems/ship-controls.js';
 import { createAudioSystem } from './systems/audio.js';
 import { ParticleSystem } from './systems/particles.js';
 import { createNavigationSystem } from './systems/navigation-hud.js';
+import { createRadar } from './systems/radar.js';
 import { createScannerSystem } from './systems/scanner-system.js';
 import { createUIManager } from './systems/ui.js';
+import { createEngagementSystem } from './systems/engagement-system.js';
 import { createGalaxyManager } from './systems/space-object-manager.js';
 import { createSettingsPanel } from './systems/settings.js';
 import { createCameraController } from './systems/camera-controller.js';
@@ -111,6 +113,7 @@ initGalaxy();
 
 // Initialize Scanner
 const scannerSystem = createScannerSystem(scene, camera, audioSystem);
+const engagementSystem = createEngagementSystem();
 
 // Create core systems
 const renderingSystem = createRenderingSystem({ scene, camera, composer, labelRenderer });
@@ -147,6 +150,7 @@ const mapSystem = createMapSystem({
     shipGroup,
     shipControls
 });
+const radar = createRadar({ galaxyManager, shipGroup });
 
 // Warp boost integration
 const originalActivateBoost = uiManager.activateWarpBoost.bind(uiManager);
@@ -175,6 +179,7 @@ function animate() {
     // Update HUD utilities
     updateMinimap(shipGroup, galaxyManager, frameCount);
     updateCompass(shipGroup, galaxyManager, frameCount);
+    radar.update();
 
     // Render frame
     renderingSystem.render();

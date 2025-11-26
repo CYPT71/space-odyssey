@@ -9,7 +9,10 @@
  * @param {Object} systems - All game systems
  * @returns {Object} Physics update functions
  */
-import { getObjectName, getObjectType } from './space-object-utils.js';
+import * as THREE from 'three';
+import { getObjectName, getObjectType, getDetectionRange } from './space-object-utils.js';
+import { emitGameplayEvent } from '../systems/gameplay-hooks.js';
+import { updateAmbientForScene } from '../effects/audio-effects.js';
 
 export function createPhysicsSystem(systems) {
     const {
@@ -25,6 +28,35 @@ export function createPhysicsSystem(systems) {
         updateLighting,
         clock
     } = systems;
+    const discovered = new Set();
+    let selectionHalo = null;
+    let lastTargetUuid = null;
+
+    const attachSelectionHalo = (target) => {
+        if (!target) return;
+        if (selectionHalo && selectionHalo.parent) {
+            selectionHalo.parent.remove(selectionHalo);
+            selectionHalo.geometry.dispose();
+            selectionHalo.material.dispose();
+        }
+        const ud = target.userData || {};
+        const type = getObjectType(ud);
+        const baseRadius = ud.radius || (target.geometry?.boundingSphere?.radius || 50000);
+        const ringRadius = Math.max(baseRadius * 1.2, getDetectionRange(type) * 0.1);
+        const geom = new THREE.RingGeometry(ringRadius * 0.9, ringRadius * 1.05, 48);
+        const mat = new THREE.MeshBasicMaterial({
+            color: 0x00F0FF,
+            transparent: true,
+            opacity: 0.35,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+        selectionHalo = new THREE.Mesh(geom, mat);
+        selectionHalo.rotation.x = Math.PI / 2;
+        selectionHalo.userData.isSelectionHalo = true;
+        target.add(selectionHalo);
+        lastTargetUuid = target.uuid;
+    };
 
     /**
      * Main physics/game update loop
@@ -84,11 +116,43 @@ export function createPhysicsSystem(systems) {
         // Update ship lighting
         updateLighting(warpFactor, currentSpeed);
 
-        // Find closest object and update HUD
-        const closestObject = galaxyManager.findClosest(shipGroup.position);
+        // Resolve target: manual selection takes precedence over proximity
+        let closestObject = null;
+        const manualTarget = window.manualTarget;
+        if (manualTarget && manualTarget.parent) {
+            const ud = manualTarget.userData || {};
+            const type = getObjectType(ud);
+            const pos = new THREE.Vector3();
+            manualTarget.getWorldPosition(pos);
+            const dist = shipGroup.position.distanceTo(pos);
+            closestObject = {
+                distance: dist,
+                planetData: ud.planetData,
+                galaxyData: ud.galaxyData,
+                cloudData: ud.cloudData,
+                isGasCloud: ud.isGasCloud,
+                isNebula: ud.isNebula,
+                type,
+                obj: manualTarget
+            };
+        } else {
+            closestObject = galaxyManager.findClosest(shipGroup.position);
+        }
+        updateAmbientForScene(galaxyManager, shipGroup, audioSystem);
         if (closestObject) {
             const rawName = getObjectName(closestObject.obj);
             const type = closestObject.type || getObjectType(closestObject.obj?.userData);
+            if (closestObject.obj?.uuid !== lastTargetUuid) {
+                attachSelectionHalo(closestObject.obj);
+            }
+            if (!discovered.has(closestObject.obj.uuid)) {
+                discovered.add(closestObject.obj.uuid);
+                emitGameplayEvent('objectDiscovered', {
+                    name: rawName,
+                    type,
+                    distance: closestObject.distance
+                });
+            }
             const prefixed = type === 'planet' ? `🌍 ${rawName}`
                 : type === 'galaxy' ? `🌌 ${rawName}`
                     : type === 'gasCloud' ? `🌫️ ${rawName}`
@@ -100,6 +164,7 @@ export function createPhysicsSystem(systems) {
         }
 
         uiManager.updateHUD(warpFactor, closestObject, currentSpeed);
+        // Optional: could emit a short-lived ping here; halo already indicates selection.
     };
 
     return { update };

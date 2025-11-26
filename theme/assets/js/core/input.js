@@ -5,6 +5,7 @@
  */
 
 import * as THREE from 'three';
+import { loadControls as loadControlsShared } from '../config/controls.js';
 
 /**
  * Creates the input handling system
@@ -22,58 +23,41 @@ export function createInputSystem(systems) {
     } = systems;
 
     const scratchVector = new THREE.Vector3();
+    let controls = loadControlsShared();
 
     // Custom confirmation modal (replaces native confirm())
-    const showTeleportConfirm = (title, message, onConfirm, onCancel) => {
+    const showTeleportConfirm = (title, message, onConfirm, onCancel, targetMeta = {}) => {
         const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9998;';
+        overlay.className = 'ap-overlay';
 
         const modal = document.createElement('div');
-        modal.style.cssText = [
-            'position:fixed',
-            'top:50%', 'left:50%', 'transform:translate(-50%,-50%)',
-            'background:rgba(0,20,40,0.95)',
-            'border:2px solid #00F0FF',
-            'padding:20px', 'min-width:320px',
-            'color:#00F0FF', 'font-family:monospace', 'text-align:center',
-            'box-shadow:0 0 20px rgba(0,240,255,0.5)',
-            'z-index:9999'
-        ].join(';');
+        modal.className = 'ap-modal';
+        modal.innerHTML = `
+            <div class="ap-chrome">
+                <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+                <span class="ap-label">AUTOPILOT // FLIGHT CONTROL</span>
+            </div>
+            <div class="ap-body">
+                <h3>${title || 'Pilot Confirmation'}</h3>
+                <p>${message || ''}</p>
+                <pre class="ap-console">target: ${targetMeta.name || 'unknown'}
+type: ${targetMeta.type || 'object'}
+distance: ${targetMeta.distance ? `${Math.round(targetMeta.distance / 1000)} km` : 'n/a'}
+approach: ${targetMeta.approach || 'standard'}</pre>
+            </div>
+            <div class="ap-actions">
+                <button id="ap-engage">⚡ ENGAGE AUTOPILOT</button>
+                <button id="ap-cancel">✕ CANCEL</button>
+            </div>
+        `;
 
-        const h = document.createElement('div');
-        h.textContent = title || 'Pilot Confirmation';
-        h.style.cssText = 'font-weight:bold;font-size:18px;margin-bottom:8px;';
-        modal.appendChild(h);
-
-        const p = document.createElement('div');
-        p.textContent = message || '';
-        p.style.cssText = 'opacity:0.9;margin-bottom:14px;';
-        modal.appendChild(p);
-
-        const btnRow = document.createElement('div');
-        btnRow.style.cssText = 'display:flex;gap:12px;justify-content:center;';
-
-        const yes = document.createElement('button');
-        yes.textContent = 'ENGAGE WARP';
-        yes.style.cssText = 'padding:8px 14px;border:1px solid #00F0FF;background:transparent;color:#00F0FF;cursor:pointer;';
-        yes.onclick = () => {
-            document.body.removeChild(overlay);
-            document.body.removeChild(modal);
-            onConfirm && onConfirm();
+        const clean = () => {
+            modal.remove();
+            overlay.remove();
         };
 
-        const no = document.createElement('button');
-        no.textContent = 'CANCEL';
-        no.style.cssText = 'padding:8px 14px;border:1px solid #FF3366;background:transparent;color:#FF3366;cursor:pointer;';
-        no.onclick = () => {
-            document.body.removeChild(overlay);
-            document.body.removeChild(modal);
-            onCancel && onCancel();
-        };
-
-        btnRow.appendChild(yes);
-        btnRow.appendChild(no);
-        modal.appendChild(btnRow);
+        modal.querySelector('#ap-engage').onclick = () => { clean(); onConfirm && onConfirm(); };
+        modal.querySelector('#ap-cancel').onclick = () => { clean(); onCancel && onCancel(); };
 
         document.body.appendChild(overlay);
         document.body.appendChild(modal);
@@ -100,6 +84,11 @@ export function createInputSystem(systems) {
         const links = container.querySelectorAll('a[href]');
 
         const openUrlInTerminal = (url) => {
+            if (!window.readingHistory) window.readingHistory = [];
+            const terminalContent = document.getElementById('reading-content');
+            if (terminalContent) {
+                window.readingHistory.push(terminalContent.innerHTML);
+            }
             fetch(url)
                 .then(res => res.text())
                 .then(html => {
@@ -171,6 +160,33 @@ export function createInputSystem(systems) {
      * Setup all event listeners
      */
     const setupEventListeners = () => {
+        // Pointer lock helpers for fine control
+        const requestPointerLock = () => {
+            if (document.pointerLockElement !== document.body && document.body.requestPointerLock) {
+                document.body.requestPointerLock();
+            }
+        };
+        const exitPointerLock = () => {
+            if (document.pointerLockElement === document.body && document.exitPointerLock) {
+                document.exitPointerLock();
+            }
+        };
+        const toggleFineControl = () => {
+            const on = !shipControls.isFineControlActive();
+            shipControls.setFineControl(on);
+            const fineBtn = document.getElementById('fine-control');
+            if (fineBtn) {
+                fineBtn.classList.toggle('active', on);
+                fineBtn.textContent = on ? 'Fine Pilot (ON)' : 'Fine Pilot';
+            }
+            if (on) {
+                shipControls.setSpeed(shipControls.getSpeed() / 2);
+                requestPointerLock();
+            } else {
+                exitPointerLock();
+            }
+        };
+
         // Teleport function (Global for onclick)
         window.teleportTo = (uuid) => {
             window.dispatchEvent(new CustomEvent('teleportRequest', { detail: { uuid } }));
@@ -204,7 +220,7 @@ export function createInputSystem(systems) {
 
             // Handle nebula teleportation (same pattern as galaxy)
             if (target.userData?.isNebula) {
-                const nebulaName = target.userData.tagName || 'Nebula';
+                const nebulaName = target.userData.nebulaName || target.userData.tagName || 'Nebula';
                 showTeleportConfirm(
                     'PILOT CONFIRMATION',
                     `Teleport to nebula "${nebulaName}"?`,
@@ -236,7 +252,7 @@ export function createInputSystem(systems) {
                 shipControls.setSpeed(0);
                 triggerTeleportEffect();
                 audioSystem.playSound('warp');
-                const name = target.userData.categoryName || 'Gas Cloud';
+                const name = target.userData.cloudName || target.userData.categoryName || 'Gas Cloud';
                 uiManager.updateHUD(0, name);
                 return;
             }
@@ -257,8 +273,8 @@ export function createInputSystem(systems) {
             triggerTeleportEffect();
             audioSystem.playSound('warp');
 
-            const name = target.userData.planetData.title || target.userData.planetData.name;
-            uiManager.updateHUD(0, name);
+                    const name = target.userData.planetData.title || target.userData.planetData.name;
+                    uiManager.updateHUD(0, name);
 
             // Open terminal automatically
             const url = target.userData.planetData.url;
@@ -283,13 +299,16 @@ export function createInputSystem(systems) {
             }
         });
 
-        // Enter key handler
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                if (uiManager.isReadingMode) {
-                    uiManager.closeReadingMode();
-                } else {
-                    const closest = galaxyManager.findClosest(shipGroup.position);
+    let targetCycleIndex = 0;
+    let targetCycleList = [];
+
+    // Enter key handler
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            if (uiManager.isReadingMode) {
+                uiManager.closeReadingMode();
+            } else {
+                const closest = galaxyManager.findClosest(shipGroup.position);
 
                     if (closest && closest.type === 'planet' && closest.planetData) {
                         const url = closest.planetData.url;
@@ -323,10 +342,10 @@ export function createInputSystem(systems) {
                         // Build journal list for gas cloud
                         const terminal = document.getElementById('reading-overlay');
                         const terminalContent = document.getElementById('reading-content');
-                        const name = closest.obj.userData?.categoryName || 'Gas Cloud';
-                        const posts = [
-                            ...(closest.cloudData.posts || []),
-                            ...Object.values(closest.cloudData.nebulae || {}).flatMap(n => n.posts || [])
+                    const name = closest.obj.userData?.cloudName || closest.obj.userData?.categoryName || 'Gas Cloud';
+                    const posts = [
+                        ...(closest.cloudData.posts || []),
+                        ...Object.values(closest.cloudData.nebulae || {}).flatMap(n => n.posts || [])
                         ];
                         const list = posts.map(p => `<li><a href="${p.url}">${p.title || p.name}</a></li>`).join('');
                         if (terminal && terminalContent) {
@@ -338,7 +357,7 @@ export function createInputSystem(systems) {
                     } else if (closest && closest.isNebula && closest.obj?.userData?.posts) {
                         const terminal = document.getElementById('reading-overlay');
                         const terminalContent = document.getElementById('reading-content');
-                        const name = closest.obj.userData.tagName || 'Nebula';
+                        const name = closest.obj.userData.nebulaName || closest.obj.userData.tagName || 'Nebula';
                         const posts = closest.obj.userData.posts || [];
                         const list = posts.map(p => `<li><a href="${p.url}">${p.title || p.name}</a></li>`).join('');
                         if (terminal && terminalContent) {
@@ -349,6 +368,62 @@ export function createInputSystem(systems) {
                         }
                     }
                 }
+            }
+            // Lock autopilot on closest with 'l'
+            if (e.key.toLowerCase() === 'l') {
+                const closest = galaxyManager.findClosest(shipGroup.position);
+                if (!closest || !closest.obj) return;
+                const targetPos = new THREE.Vector3();
+                closest.obj.getWorldPosition(targetPos);
+                let stopDistance = 100000;
+                const ud = closest.obj.userData || {};
+                if (ud.isGasCloud || ud.cloudData) stopDistance = 500000;
+                else if (ud.isGalaxy || ud.galaxyData) stopDistance = 0;
+                else if (ud.isNebula) stopDistance = 0;
+                shipControls.engageAutopilot(targetPos, stopDistance, closest.obj);
+                triggerTeleportEffect();
+                audioSystem.playSound('warp');
+            }
+            // Cycle overlapping targets with 'n' or remapped control
+            controls = loadControlsShared();
+            const cycleKey = (controls.targetCycle || 'n').toLowerCase();
+            if (e.key.toLowerCase() === cycleKey) {
+                const shipPos = shipGroup.position;
+                const all = galaxyManager.getAllObjects();
+                const mapped = all
+                    .map(obj => {
+                        const ud = obj.userData || {};
+                        const type = getObjectType(ud);
+                        if (type === 'unknown') return null;
+                        const pos = new THREE.Vector3();
+                        obj.getWorldPosition(pos);
+                        const dist = shipPos.distanceTo(pos);
+                        const range = getDetectionRange(type);
+                        return { obj, dist, type, range };
+                    })
+                    .filter(Boolean);
+
+                if (!mapped.length) return;
+                const minDist = mapped.reduce((m, c) => Math.min(m, c.dist), Infinity);
+                const candidates = mapped
+                    .filter(c => c.range && c.dist <= Math.min(c.range * 0.25, minDist + 20000))
+                    .sort((a, b) => a.dist - b.dist);
+
+                if (!candidates.length) return;
+                targetCycleList = candidates;
+                targetCycleIndex = (targetCycleIndex + 1) % candidates.length;
+                const pick = candidates[targetCycleIndex];
+                // Just select target, do not move ship
+                const ud = pick.obj.userData || {};
+                const type = pick.type;
+                const name = ud.planetData?.title || ud.planetData?.name ||
+                    ud.cloudName || ud.categoryName || ud.cloudData?.name ||
+                    ud.nebulaName || ud.tagName ||
+                    ud.galaxyName || ud.galaxyData?.name ||
+                    'Object';
+                const icon = type === 'planet' ? '🌍' : type === 'gasCloud' ? '🌫️' : type === 'nebula' ? '✨' : type === 'galaxy' ? '🌌' : '';
+                uiManager.hudTarget.textContent = `TARGET: ${icon} ${name}`;
+                window.manualTarget = pick.obj;
             }
         });
 
@@ -381,6 +456,42 @@ export function createInputSystem(systems) {
                 shipControls.setSpeed(0);
                 triggerTeleportEffect();
                 audioSystem.playSound('warp');
+            });
+        }
+
+        // Fine control toggle
+        const fineBtn = document.getElementById('fine-control');
+        if (fineBtn) {
+            fineBtn.addEventListener('click', () => {
+                toggleFineControl();
+            });
+        }
+
+        // Mouse steering for fine control
+        window.addEventListener('mousemove', (e) => {
+            if (!shipControls.isFineControlActive()) return;
+            if (uiManager.isReadingMode) return;
+            shipControls.applyMouseDelta(e.movementX, e.movementY);
+        });
+
+        // Fine control toggle only via button
+
+        const backBtn = document.getElementById('reading-back');
+        if (backBtn) {
+            backBtn.addEventListener('click', () => {
+                const terminal = document.getElementById('reading-overlay');
+                const terminalContent = document.getElementById('reading-content');
+                if (!terminal || !terminalContent) return;
+                if (window.readingHistory && window.readingHistory.length > 0) {
+                    const prev = window.readingHistory.pop();
+                    terminalContent.innerHTML = prev;
+                    terminal.classList.remove('hidden');
+                    uiManager.openReadingMode();
+                    interceptLinksInContent(terminalContent);
+                } else {
+                    terminal.classList.add('hidden');
+                    uiManager.closeReadingMode();
+                }
             });
         }
     };

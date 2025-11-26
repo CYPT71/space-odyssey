@@ -374,7 +374,8 @@ export function updateMinimap(shipGroup, galaxyManager, frameCount) {
             nebula.getWorldPosition(scratchVector2);
             const nDist = shipPos.distanceTo(scratchVector2);
             const postsCount = Array.isArray(nebula.userData?.posts) ? nebula.userData.posts.length : 0;
-            const name = (nebula.userData?.tagName || 'Nebula') + (postsCount ? ` (${postsCount})` : '');
+            const nameBase = nebula.userData?.nebulaName || nebula.userData?.tagName || 'Nebula';
+            const name = nameBase + (postsCount ? ` (${postsCount})` : '');
 
             cloudRows.push({
                 uuid: nebula.uuid,
@@ -397,7 +398,7 @@ export function updateMinimap(shipGroup, galaxyManager, frameCount) {
             const cloudData = cloud.userData?.cloudData || {};
             const postsCount = (cloudData.posts ? cloudData.posts.length : 0) +
                 Object.values(cloudData.nebulae || {}).reduce((a, n) => a + (n.posts ? n.posts.length : 0), 0);
-            const nameBase = cloud.userData?.categoryName || cloudData.name || 'Gas Cloud';
+            const nameBase = cloud.userData?.cloudName || cloudData.name || cloud.userData?.categoryName || 'Gas Cloud';
             const displayName = postsCount ? `${nameBase} (${postsCount})` : nameBase;
 
             cloud.getWorldPosition(scratchVector);
@@ -412,7 +413,7 @@ export function updateMinimap(shipGroup, galaxyManager, frameCount) {
                 hasCaret: true,
                 caretSymbol: collapsed ? '▸' : '▾',
                 onCaretClick: () => window.toggleCloud(cloud.uuid),
-                style: { color: '#66FFCC' }
+                style: { color: '#FF00FF' }
             });
 
             if (window.minimapState.gasCollapsed || collapsed) return;

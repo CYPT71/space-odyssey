@@ -4,7 +4,7 @@
  * @version 2.0.0
  */
 
-import { AUDIO } from '../config/constants.js';
+import { AUDIO_CONFIG as AUDIO } from '../config/audio-config.js';
 
 /**
  * Creates audio system (functional approach)
@@ -54,6 +54,18 @@ export const createAudioSystem = () => {
         return { oscillator, gainNode };
     };
 
+    const createAmbient = (freq) => {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.start();
+        return { oscillator, gainNode };
+    };
+
     /**
      * Initializes audio on first user interaction
      * @returns {void}
@@ -63,6 +75,8 @@ export const createAudioSystem = () => {
             if (!initialized) {
                 engineSound = createEngineSound();
                 warpSound = createWarpSound();
+                ambientGas = createAmbient(32);
+                ambientNebula = createAmbient(48);
                 initialized = true;
             }
         };
@@ -237,6 +251,8 @@ export const createAudioSystem = () => {
     };
 
     let ambientSound = null;
+    let ambientGas = null;
+    let ambientNebula = null;
 
     /**
      * Updates ambient sound based on speed
@@ -249,6 +265,24 @@ export const createAudioSystem = () => {
         // Wind gets louder and higher pitched with speed
         ambientSound.gainNode.gain.setTargetAtTime(0.05 + speedRatio * 0.2, audioContext.currentTime, 0.1);
         ambientSound.filter.frequency.setTargetAtTime(100 + speedRatio * 1000, audioContext.currentTime, 0.1);
+    };
+
+    const updateAmbientProximity = ({ gasDist = Infinity, nebulaDist = Infinity }) => {
+        if (!initialized) return;
+        const ensureTone = () => {
+            if (!ambientGas) ambientGas = createAmbient(32);
+            if (!ambientNebula) ambientNebula = createAmbient(48);
+        };
+        ensureTone();
+
+        const falloff = (d, max) => {
+            if (!isFinite(d)) return 0;
+            return Math.max(0, 1 - d / max);
+        };
+        const gasGain = Math.min(0.25, falloff(gasDist, 12000000) * 0.25);
+        const nebGain = Math.min(0.25, falloff(nebulaDist, 12000000) * 0.25);
+        ambientGas.gainNode.gain.setTargetAtTime(gasGain, audioContext.currentTime, 0.1);
+        ambientNebula.gainNode.gain.setTargetAtTime(nebGain, audioContext.currentTime, 0.1);
     };
 
     /**
@@ -298,6 +332,7 @@ export const createAudioSystem = () => {
         updateEngineSound,
         updateWarpSound,
         updateAmbient, // New
+        updateAmbientProximity,
         playBoostSound,
         playTeleportSound,
         playSound

@@ -29,12 +29,16 @@ const HIERARCHY_NODE_PROPS = Object.freeze({
     galaxy: {
         childKey: 'subGalaxies',
         leafKey: 'files',
-        typeFlag: 'isGalaxy'
+        typeFlag: 'isGalaxy',
+        isGalaxy: true,
+        spaceType: 'galaxy'
     },
     nebula: {
         childKey: 'nebulae',
         leafKey: 'posts',
-        typeFlag: 'isNebula'
+        typeFlag: 'isNebula',
+        isGalaxy: false,
+        spaceType: 'nebula'
     }
 });
 
@@ -77,8 +81,14 @@ const makeFileClassifier = ({ includePaths, includeUrls, extensions = ['.md'], d
  */
 export const isContentFile = makeFileClassifier({
     includePaths: [/^\//, /^content\/_pages\//, /^_pages\//],
-    includeUrls: [/^\//],
-    disallow: [/^\/posts\//],
+    includeUrls: [/^\/(?!posts\/)/], // exclude /posts/ urls from pages
+    disallow: [
+        /^\/posts\//,
+        /^_posts\//,
+        /^content\/_posts\//,
+        // Posts often look like /devops/2024-11-22-slug
+        /^\/[^/]+\/\d{4}-\d{2}-\d{2}-/
+    ],
     extensions: []
 });
 
@@ -89,8 +99,12 @@ export const isContentFile = makeFileClassifier({
  * @returns {boolean} True if posts post in /posts/
  */
 export const isPostsPost = makeFileClassifier({
-    includePaths: [/^\/posts\//, /^content\/_posts\//],
-    includeUrls: [/^\/posts\//],
+    includePaths: [/^\/posts\//, /^content\/_posts\//, /^_posts\//],
+    includeUrls: [
+        /^\/posts\//,
+        // Accept date-slug style at root (e.g. /devops/2024-11-22-foo)
+        /^\/[^/]+\/\d{4}-\d{2}-\d{2}-/
+    ],
     extensions: ['.md'],
     requireUrl: false
 });
@@ -134,12 +148,18 @@ const makePartsParser = ({ prefixes, defaultFirstSegment }) => (file) => {
  * @param {string} [typeFlag] - Boolean flag stored on the node (e.g. 'isGalaxy' or 'isNebula')
  * @returns {Object} Hierarchy node
  */
-const createHierarchyNode = (name, childKey, leafKey, typeFlag) => ({
-    name,
-    [leafKey]: [],
-    [childKey]: {},
-    ...(typeFlag ? { [typeFlag]: true } : {})
-});
+const createHierarchyNode = (name, nodeProps = {}) => {
+    const { childKey, leafKey, typeFlag, isGalaxy, spaceType } = nodeProps;
+
+    return {
+        name,
+        [leafKey]: [],
+        [childKey]: {},
+        ...(typeFlag ? { [typeFlag]: true } : {}),
+        ...(typeof isGalaxy === 'boolean' ? { isGalaxy } : {}),
+        ...(spaceType ? { spaceType } : {})
+    };
+};
 
 /**
  * Generates a function that returns the parent node and remaining parts for a
@@ -170,9 +190,10 @@ const makeContainerGetter = (rootBucket, nodeProps, minDepth = 0) => (parts) => 
  * @param {string} [options.typeFlag] - Flag name to set on the node
  * @returns {Object} The fetched or newly created node
  */
-const getOrCreateNode = (bucket, name, { childKey, leafKey, typeFlag }) => {
+const getOrCreateNode = (bucket, name, nodeProps) => {
+    const { childKey, typeFlag } = nodeProps;
     if (!bucket[name]) {
-        bucket[name] = createHierarchyNode(name, childKey, leafKey, typeFlag);
+        bucket[name] = createHierarchyNode(name, nodeProps);
         console.log('🌀 create node', name, typeFlag ? `(${typeFlag})` : '');
     }
     return bucket[name];
@@ -190,7 +211,8 @@ const getOrCreateNode = (bucket, name, { childKey, leafKey, typeFlag }) => {
  * @param {string} options.typeFlag - Boolean flag to set on child nodes
  * @returns {void}
  */
-const addToHierarchy = (node, pathParts, file, { childKey, leafKey, typeFlag }) => {
+const addToHierarchy = (node, pathParts, file, nodeProps) => {
+    const { childKey, leafKey } = nodeProps;
     if (!Array.isArray(pathParts) || pathParts.length <= 1) {
         node[leafKey].push(file);
         return;
@@ -204,8 +226,8 @@ const addToHierarchy = (node, pathParts, file, { childKey, leafKey, typeFlag }) 
         return;
     }
 
-    const childNode = getOrCreateNode(node[childKey], childName, { childKey, leafKey, typeFlag });
-    addToHierarchy(childNode, pathParts.slice(1), file, { childKey, leafKey, typeFlag });
+    const childNode = getOrCreateNode(node[childKey], childName, nodeProps);
+    addToHierarchy(childNode, pathParts.slice(1), file, nodeProps);
 };
 
 const noop = () => {};
@@ -237,14 +259,24 @@ export const parseFileSystem = (files) => {
         const reject = [];
 
         list.forEach((file) => {
+            const normalizedPath = file.path || '';
+            // Fast path: anything living under _posts belongs to posts bucket
+            if (/_posts\//.test(normalizedPath)) {
+                const postsClassifier = classifiers.find(({ key }) => key === 'posts');
+                if (postsClassifier) {
+                    buckets.posts.push(file);
+                    return;
+                }
+            }
+
             const classifier = classifiers.find(({ test }) => test(file.path, file.url));
             if (classifier) {
                 buckets[classifier.key].push(file);
                 return;
             }
 
-            if (!EXCLUDED_PATTERNS.some(p => p.test(file.path))) {
-                reject.push(file.path);
+            if (!EXCLUDED_PATTERNS.some(p => p.test(normalizedPath))) {
+                reject.push(normalizedPath);
             }
         });
 
@@ -266,12 +298,15 @@ export const parseFileSystem = (files) => {
             getParts,
             handleRootLeaf,
             getContainer,
-            childKey,
-            leafKey,
-            typeFlag,
             onAssigned,
-            onParts
+            onParts,
+            nodeProps: explicitNodeProps,
+            ...fallbackProps
         } = options;
+
+        // Nebula and galaxy share this builder; the nodeProps toggle the render path.
+        const nodeProps = explicitNodeProps || fallbackProps;
+        const { childKey, leafKey, typeFlag } = nodeProps;
 
         items.forEach(file => {
             const parts = getParts(file);
@@ -291,20 +326,33 @@ export const parseFileSystem = (files) => {
                 return;
             }
 
-            addToHierarchy(parentNode, remainingParts, file, { childKey, leafKey, typeFlag });
+            addToHierarchy(parentNode, remainingParts, file, nodeProps);
 
             if (typeof onAssigned === 'function') {
-                onAssigned(file, parts, parentNode.name);
+                onAssigned(file, parts, parentNode.name, nodeProps);
             }
         });
     };
 
     const galaxyNodeProps = HIERARCHY_NODE_PROPS.galaxy;
     const nebulaNodeProps = HIERARCHY_NODE_PROPS.nebula;
-    const postPartsFrom = makePartsParser({
-        prefixes: ['/?posts/', '/posts/', 'posts/', 'content/_posts/'],
-        defaultFirstSegment: 'uncategorized'
-    });
+    // Custom post parts parser: crawl all subfolders under posts until the file
+    const postPartsFrom = (file) => {
+        let raw = file.path || file.url || '';
+        raw = raw.replace(/\\/g, '/').replace(/^\.\//, '');
+
+        // Strip common prefixes
+        raw = raw
+            .replace(/^\/?content\/_posts\//, '')
+            .replace(/^\/?_posts\//, '')
+            .replace(/^\/?posts\//, '')
+            .replace(/^\//, '');
+
+        raw = raw.replace(/\/$/, '').replace(/\.md$/, '').replace(/\.html?$/, '');
+        const parts = raw.split('/').filter(Boolean);
+        if (parts.length === 1) return ['uncategorized', ...parts]; // ensure a cloud bucket
+        return parts;
+    };
 
     const partsLogger = (label) => (file, parts) => {
         console.log(label, { url: file.url, path: file.path, parts });
@@ -346,10 +394,12 @@ export const parseFileSystem = (files) => {
 
     const processHierarchies = (configs) => {
         if (!Array.isArray(configs) || configs.length === 0) return;
-        const [current, ...rest] = configs;
-        const { items, nodeProps, ...options } = current;
-        buildHierarchy(items, { ...nodeProps, ...options });
-        processHierarchies(rest);
+        configs.forEach(({ items, nodeProps, onParts, ...options }) => {
+            const logger = typeof onParts === 'function'
+                ? onParts
+                : partsLogger(`🧭 ${nodeProps.spaceType || nodeProps.typeFlag || 'hierarchy'} parts`);
+            buildHierarchy(items, { nodeProps, onParts: logger, ...options });
+        });
     };
 
     processHierarchies(hierarchyConfigs);

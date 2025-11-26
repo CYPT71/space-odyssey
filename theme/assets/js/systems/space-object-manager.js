@@ -14,16 +14,8 @@ import { createGalaxyTrails, createAnimatedTrails, updateAnimatedTrails } from '
 import { createPostsGasClouds, updateGasClouds } from './gas-cloud-system.js';
 import { getObjectType, getDetectionRange } from '../core/space-object-utils.js';
 import { Octree } from '../core/octree.js';
-
-/**
- * Space object types
- */
-const OBJECT_TYPES = {
-    GALAXY: 'galaxy',
-    GAS_CLOUD: 'gasCloud',
-    PLANET: 'planet',
-    POST: 'post'
-};
+import { startMark, endMark, getDuration } from '../core/profiler.js';
+import { OBJECT_TYPES } from '../config/types.js';
 
 /**
  * Creates unified space object manager
@@ -39,6 +31,39 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
     let animatedTrails = [];
     const navigation = createNavigationSystem(audioSystem);
     const octree = new Octree(15000000000); // 15 billion units (accommodates 8B galaxy spacing + 4B galaxy size)
+
+    const hashFiles = (files) => {
+        if (!Array.isArray(files)) return 0;
+        let hash = 0;
+        files.forEach(f => {
+            const str = `${f.path || ''}|${f.url || ''}`;
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash |= 0;
+            }
+        });
+        return hash;
+    };
+
+    const loadCachedTree = (hash) => {
+        try {
+            const raw = localStorage.getItem('spaceTreeCache');
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (parsed.hash !== hash) return null;
+            return parsed.tree;
+        } catch (_) {
+            return null;
+        }
+    };
+
+    const saveCachedTree = (hash, tree) => {
+        try {
+            localStorage.setItem('spaceTreeCache', JSON.stringify({ hash, tree }));
+        } catch (_) {
+            /* ignore */
+        }
+    };
 
     // Type and range helpers come from core utils
 
@@ -179,23 +204,48 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
 
         // Optional: offload parse to Web Worker for responsiveness
         try {
+            const hash = hashFiles(window.fileSystem);
+            const cached = loadCachedTree(hash);
+
+            const parseAndPopulate = () => {
+                const tree = parseSpaceTree(window.fileSystem);
+                saveCachedTree(hash, tree);
+                populateFromTree(tree);
+            };
+
+            if (cached) {
+                console.log('🗃️ Loaded cached SpaceTree');
+                populateFromTree(cached);
+                return;
+            }
+
             if (window.Worker) {
                 const worker = new Worker(new URL('../workers/parse-worker.js', import.meta.url), { type: 'module' });
                 worker.onmessage = (e) => {
                     console.log('🧵 Worker parsed tree');
+                    saveCachedTree(hash, e.data);
                     populateFromTree(e.data);
                 };
                 worker.onerror = (err) => {
                     console.error('Parse worker failed, falling back:', err);
-                    populateFromTree(parseSpaceTree(window.fileSystem));
+                    parseAndPopulate();
                 };
-                worker.postMessage({ files: window.fileSystem });
+                worker.postMessage({ files: window.fileSystem, hash });
             } else {
-                populateFromTree(parseSpaceTree(window.fileSystem));
+                parseAndPopulate();
             }
         } catch (e) {
             console.warn('Worker parse unavailable, using main thread:', e);
-            populateFromTree(parseSpaceTree(window.fileSystem));
+            const hash = hashFiles(window.fileSystem);
+            const cached = loadCachedTree(hash);
+            if (cached) {
+                console.log('🗃️ Loaded cached SpaceTree');
+                populateFromTree(cached);
+            } else {
+                const tree = parseSpaceTree(window.fileSystem);
+                saveCachedTree(hash, tree);
+                populateFromTree(tree);
+            }
         }
     };
 
@@ -203,16 +253,30 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
      * Updates all space objects
      */
     const update = () => {
-        // Update galaxies
+        startMark('galaxies');
         galaxies.forEach(galaxy => updateGalaxy(galaxy));
+        endMark('galaxies');
 
-        // Update animated trails
+        startMark('trails');
         animatedTrails.forEach(trail => {
             updateAnimatedTrails(trail, 0.016);
         });
+        endMark('trails');
 
-        // Update gas clouds
+        startMark('gasClouds');
         updateGasClouds(gasClouds, 0.016);
+        endMark('gasClouds');
+
+        const g = getDuration('galaxies');
+        const c = getDuration('gasClouds');
+        const t = getDuration('trails');
+        if (g > 10 || c > 10 || t > 10) {
+            console.warn('⏱️ Frame budget warning', {
+                galaxies: g?.toFixed?.(2),
+                gasClouds: c?.toFixed?.(2),
+                trails: t?.toFixed?.(2)
+            });
+        }
     };
 
     /**

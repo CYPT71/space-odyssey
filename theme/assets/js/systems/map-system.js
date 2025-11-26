@@ -17,10 +17,10 @@ export function createMapSystem(systems) {
     // Create Map Overlay
     const overlay = document.createElement('div');
     overlay.id = 'map-overlay';
+    overlay.className = 'terminal-panel';
     overlay.style.cssText = `
         position: fixed;
         top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0, 10, 20, 0.95);
         z-index: 9000;
         display: none;
         justify-content: center;
@@ -40,6 +40,22 @@ export function createMapSystem(systems) {
     let isDragging = false;
     let lastMouse = { x: 0, y: 0 };
 
+    const centerOnShip = () => {
+        offset.x = -shipGroup.position.x * scale;
+        offset.y = -shipGroup.position.z * scale;
+        render();
+    };
+
+    // Center button
+    const centerBtn = document.createElement('button');
+    centerBtn.textContent = 'Center on Ship';
+    centerBtn.style.cssText = 'position:absolute;top:20px;right:20px;z-index:9001;padding:8px 12px;border:1px solid #00F0FF;background:rgba(0,20,40,0.85);color:#00F0FF;font-family:monospace;cursor:pointer;';
+    centerBtn.addEventListener('click', () => {
+        if (!isOpen) return;
+        centerOnShip();
+    });
+    overlay.appendChild(centerBtn);
+
     // Resize handler
     window.addEventListener('resize', () => {
         canvas.width = window.innerWidth;
@@ -52,11 +68,11 @@ export function createMapSystem(systems) {
             isOpen = !isOpen;
             overlay.style.display = isOpen ? 'flex' : 'none';
             if (isOpen) {
-                // Center on ship initially
-                offset.x = -shipGroup.position.x * scale;
-                offset.y = -shipGroup.position.z * scale;
+                centerOnShip();
                 render();
             }
+        } else if (e.key.toLowerCase() === 'c' && isOpen) {
+            centerOnShip();
         }
     });
 
@@ -125,24 +141,15 @@ export function createMapSystem(systems) {
             const userData = closest.userData || {};
             const planetData = userData.planetData || {};
             const name = planetData.title || planetData.tiitle || planetData.name ||
-                userData.tagName || userData.categoryName || userData.cloudData?.name ||
+                userData.nebulaName || userData.tagName || userData.cloudName || userData.categoryName || userData.cloudData?.name ||
                 'Unknown Object';
 
             // Check autopilot confirmation setting
             const requireConfirmation = localStorage.getItem('autopilotConfirmation') !== 'false';
 
-            let confirmed = true;
-            if (requireConfirmation) {
-                confirmed = window.confirm(`Engage Autopilot to ${name}?`);
-            }
-
-            if (confirmed) {
+            const engageAutopilot = () => {
                 const targetPos = new THREE.Vector3();
                 closest.getWorldPosition(targetPos);
-
-                // Store the object itself for continuous tracking
-                state.autopilot.targetObject = closest;
-                state.autopilot.targetPos = targetPos.clone(); // fallback position
 
                 // Calculate safe approach distance
                 let stopDistance = 100000; // Default 100 km (in atmosphere)
@@ -158,7 +165,7 @@ export function createMapSystem(systems) {
 
                 // Target slightly offset to avoid collision (only for planets/clouds)
                 const approachOffset = stopDistance > 0 ? new THREE.Vector3(0, 0, 20000) : new THREE.Vector3(0, 0, 0);
-                shipControls.engageAutopilot(targetPos.clone().add(approachOffset), stopDistance);
+                shipControls.engageAutopilot(targetPos.clone().add(approachOffset), stopDistance, closest);
                 isOpen = false;
                 overlay.style.display = 'none';
 
@@ -168,6 +175,11 @@ export function createMapSystem(systems) {
                 notification.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(255,0,255,0.9);color:#fff;padding:20px;border-radius:10px;font-family:monospace;z-index:10000;font-size:18px;';
                 document.body.appendChild(notification);
                 setTimeout(() => notification.remove(), 3000);
+            }
+            if (requireConfirmation) {
+                window.dispatchEvent(new CustomEvent('teleportRequest', { detail: { uuid: closest.uuid } }));
+            } else {
+                engageAutopilot();
             }
         }
     });
@@ -234,7 +246,7 @@ export function createMapSystem(systems) {
                 // Show gas cloud names
                 ctx.fillStyle = '#0F8';
                 ctx.font = '10px monospace';
-                const cloudName = ud.categoryName || ud.cloudData?.name || 'Gas Cloud';
+                const cloudName = ud.cloudName || ud.categoryName || ud.cloudData?.name || 'Gas Cloud';
                 ctx.fillText(cloudName, sx + 22, sy + 4);
             } else if (ud.isNebula) {
                 ctx.fillStyle = 'rgba(255, 100, 255, 0.2)';
@@ -244,7 +256,7 @@ export function createMapSystem(systems) {
                 // Show nebula names
                 ctx.fillStyle = '#F6F';
                 ctx.font = '10px monospace';
-                const nebulaName = ud.tagName || 'Nebula';
+                const nebulaName = ud.nebulaName || ud.tagName || 'Nebula';
                 ctx.fillText(nebulaName, sx + 17, sy + 4);
             }
         });

@@ -97,9 +97,9 @@ export const createGalaxy = (galaxyData, position = { x: 0, y: 0, z: 0 }) => {
     group.add(core);
 
     // Planets in orbit (randomized 3D positions) - MASSIVE GALAXIES
-    const baseRadius = 4000000; // 4 billion units - huge galaxy scale
+    const baseRadius = 6000000; // Increased spacing for intra-galaxy planets
     const heightRange = 800000; // +/- 800M height variation
-    const minSep = 60000; // 60 km minimum separation (reduced for closer planets)
+    const minSep = 120000; // Larger minimum separation for clearer gaps
     const positions = generatePlanetPositions(galaxyData.files.length, baseRadius, heightRange, minSep);
     galaxyData.files.forEach((file, i) => {
         const pos = positions[i];
@@ -118,7 +118,7 @@ export const createGalaxy = (galaxyData, position = { x: 0, y: 0, z: 0 }) => {
     const subGalaxies = Object.values(galaxyData.subGalaxies);
     subGalaxies.forEach((subGalaxy, i) => {
         const angle = (i / subGalaxies.length) * Math.PI * 2;
-        const radius = 1400000; // much further from core for larger scale
+        const radius = 2000000; // push sub-galaxies further from core
 
         const subGroupResult = createGalaxy(subGalaxy, {
             x: Math.cos(angle) * radius,
@@ -143,6 +143,7 @@ export const createGalaxy = (galaxyData, position = { x: 0, y: 0, z: 0 }) => {
 
     group.userData = {
         galaxyData,
+        galaxyName: galaxyData.name,
         particles,
         isGalaxy: true
     };

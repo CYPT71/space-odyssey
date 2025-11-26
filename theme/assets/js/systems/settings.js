@@ -8,6 +8,8 @@
  * Creates settings panel manager
  * @returns {Object} Settings panel functions
  */
+import { loadControls as loadControlsShared, saveControls as saveControlsShared, resetControls as resetControlsShared } from '../config/controls.js';
+
 export const createSettingsPanel = () => {
     const panel = document.getElementById('settings-panel');
     const settingsBtn = document.getElementById('settings-button');
@@ -32,24 +34,21 @@ export const createSettingsPanel = () => {
         stop: 'c'
     };
 
-    let controls = { ...defaultControls };
+    let controls = loadControlsShared();
 
     /**
      * Loads controls from localStorage
      */
     const loadControls = () => {
-        const saved = localStorage.getItem('shipControls');
-        if (saved) {
-            controls = JSON.parse(saved);
-            updateButtonLabels();
-        }
+        controls = loadControlsShared();
+        updateButtonLabels();
     };
 
     /**
      * Saves controls to localStorage
      */
     const saveControls = () => {
-        localStorage.setItem('shipControls', JSON.stringify(controls));
+        saveControlsShared(controls);
     };
 
     /**
@@ -118,7 +117,7 @@ export const createSettingsPanel = () => {
      * Resets controls to default
      */
     const reset = () => {
-        controls = { ...defaultControls };
+        controls = resetControlsShared();
         updateButtonLabels();
         saveControls();
     };
@@ -152,6 +151,12 @@ export const createSettingsPanel = () => {
 
     if (resetBtn) {
         resetBtn.addEventListener('click', reset);
+    }
+
+    // Add custom binding for target cycle
+    const targetCycleBtn = document.getElementById('bind-target-cycle');
+    if (targetCycleBtn) {
+        targetCycleBtn.addEventListener('click', () => startRecording(targetCycleBtn, 'targetCycle'));
     }
 
     // Setup key button listeners

@@ -7,6 +7,8 @@
 
 import * as THREE from 'three';
 import { PHYSICS, GRAVITY } from '../config/constants.js';
+import { applyShipAnimations } from './animations.js';
+import { loadControls as loadControlsShared } from '../config/controls.js';
 
 // ============================================================
 // CONSTANTS
@@ -54,13 +56,16 @@ const createShipState = () => ({
     rotVel: { x: 0, y: 0, z: 0 },
     targetBankAngle: 0,
     currentBankAngle: 0,
+    fineControl: false,
+    mouseDelta: { x: 0, y: 0 },
     // Autopilot State
     autopilot: {
         active: false,
         targetPos: null,
         targetObj: null,
         minDistance: 15000000, // Default 15,000 km
-        warp20Active: false // Warp 20 mode
+        warp20Active: false, // Warp 20 mode
+        lastDistance: null
     }
 });
 
@@ -69,19 +74,7 @@ const createShipState = () => ({
  * @returns {Object} Control mappings
  */
 const loadControlMappings = () => {
-    const defaults = {
-        forward: 'z', backward: 's', yawLeft: 'q', yawRight: 'd',
-        pitchUp: 'w', pitchDown: 'x', rollLeft: 'r', rollRight: 'f',
-        strafeLeft: 'a', strafeRight: 'e', moveUp: ' ', moveDown: 'Shift', stop: 'c'
-    };
-
-    try {
-        const saved = localStorage.getItem('shipControls');
-        return saved ? JSON.parse(saved) : defaults;
-    } catch (e) {
-        console.warn('Failed to load controls:', e);
-        return defaults;
-    }
+    return loadControlsShared();
 };
 
 // ============================================================
@@ -183,9 +176,11 @@ const calculateBankingAngle = (state, controls) => {
  * @param {Object} state - Ship state
  * @param {Object} controls - Control mappings
  */
-const updateBanking = (state, controls) => {
-    state.targetBankAngle = calculateBankingAngle(state, controls);
-    state.currentBankAngle += (state.targetBankAngle - state.currentBankAngle) * ROTATION_CONFIG.BANK_SPEED;
+    const updateBanking = (state, controls) => {
+        state.targetBankAngle = calculateBankingAngle(state, controls);
+        state.currentBankAngle += (state.targetBankAngle - state.currentBankAngle) * ROTATION_CONFIG.BANK_SPEED;
+        // Subtle easing for smoother transitions
+        state.currentBankAngle *= 0.99;
 };
 
 /**
@@ -193,11 +188,11 @@ const updateBanking = (state, controls) => {
  * @param {THREE.Object3D} shipGroup - Ship object
  * @param {Object} state - Ship state
  */
-const applyRotation = (shipGroup, state) => {
-    shipGroup.rotation.x += state.rotVel.x;
-    shipGroup.rotation.y += state.rotVel.y;
-    shipGroup.rotation.z = state.currentBankAngle + (state.rotVel.z * 10);
-};
+    const applyRotation = (shipGroup, state) => {
+        shipGroup.rotation.x += state.rotVel.x;
+        shipGroup.rotation.y += state.rotVel.y;
+        shipGroup.rotation.z = state.currentBankAngle + (state.rotVel.z * 10);
+    };
 
 // ============================================================
 // MOVEMENT SYSTEM
@@ -278,10 +273,12 @@ const updateAutopilot = (shipGroup, state) => {
         if (ud.isGasCloud || ud.cloudData) {
             stopDist = 500000; // 500 km for gas clouds
         } else if (ud.galaxyData || ud.isGalaxy) {
-            stopDist = 0; // stop at centre of galaxy
+            stopDist = 200000; // approach within 200 km
         } else if (ud.isNebula) {
-            stopDist = 0; // stop at centre of nebula
+            stopDist = 200000; // approach within 200 km
         }
+        // Safety: never below 50 km
+        stopDist = Math.max(stopDist, 50000);
         state.autopilot.minDistance = stopDist;
 
         // Validate distance
@@ -291,12 +288,34 @@ const updateAutopilot = (shipGroup, state) => {
             return;
         }
 
+        // If we're not closing in (distance grows) for repeated frames, disengage
+        if (state.autopilot.lastDistance !== null && distance > state.autopilot.lastDistance * 1.02) {
+            console.warn('Autopilot: distance increasing, disengaging');
+            state.autopilot.active = false;
+            state.autopilot.warp20Active = false;
+            state.speed = 0;
+            state.warpLevel = 0;
+            state.autopilot.lastDistance = null;
+            return;
+        }
+        state.autopilot.lastDistance = distance;
+
         // Arrival check
-        if (distance <= stopDist) {
+        if (distance <= stopDist + 5000) {
             state.speed = 0;
             state.warpLevel = 0;
             state.autopilot.active = false;
             state.autopilot.warp20Active = false;
+            // Face target on arrival
+            if (state.autopilot.targetObject && state.autopilot.targetObject.getWorldPosition) {
+                const lookPos = new THREE.Vector3();
+                state.autopilot.targetObject.getWorldPosition(lookPos);
+                shipGroup.lookAt(lookPos);
+            } else if (state.autopilot.targetPos) {
+                shipGroup.lookAt(state.autopilot.targetPos);
+            }
+            state.rotVel.x = state.rotVel.y = state.rotVel.z = 0;
+            state.autopilot.lastDistance = null;
             console.log('Autopilot: Arrived at destination');
             return;
         }
@@ -306,7 +325,7 @@ const updateAutopilot = (shipGroup, state) => {
         const targetRotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
         shipGroup.quaternion.slerp(targetRotation, 0.05);
 
-        // Speed control with Warp 20 persistence
+        // Speed control with Warp 20 persistence and gradual slowdown
         let desiredWarp = 0;
         if (distance > stopDist + 200000) { // keep Warp 20 until within 200 km of stop point
             desiredWarp = 20;
@@ -330,8 +349,12 @@ const updateAutopilot = (shipGroup, state) => {
 
         // Ensure forward motion
         const targetSpeed = calculateSpeed(state.warpLevel);
-        if (isFinite(targetSpeed) && state.speed < targetSpeed) {
-            state.speed = targetSpeed;
+        if (isFinite(targetSpeed)) {
+            // Smooth deceleration as we approach
+            const approachFactor = Math.min(1, Math.max(0, (distance - stopDist) / (stopDist + 200000)));
+            const cappedSpeed = targetSpeed * (0.2 + 0.8 * approachFactor);
+            state.speed = Math.min(state.speed, cappedSpeed);
+            if (state.speed < cappedSpeed) state.speed = cappedSpeed;
         }
     } catch (error) {
         console.error('Error in autopilot update:', error);
@@ -465,7 +488,33 @@ export const createShipControls = (shipGroup) => {
             applyRotation(shipGroup, state);
             applyStrafeMovement(shipGroup, state, controls);
             applyVerticalMovement(shipGroup, state, controls);
+
+            if (state.fineControl) {
+                // Mouse steering for fine control
+                const mx = state.mouseDelta.x;
+                const my = state.mouseDelta.y;
+                state.rotVel.y += (-mx * 0.00001);
+                state.rotVel.x += (-my * 0.00001);
+                state.mouseDelta.x = 0;
+                state.mouseDelta.y = 0;
+                // Clamp speed to fine impulse
+                const fineSpeed = WARP_SPEEDS[0] / 8;
+                state.speed = Math.min(state.speed, fineSpeed);
+            }
         }
+        applyShipAnimations(shipGroup, state);
+        // Animate impulse glows based on speed
+        const engines = shipGroup.userData?.impulseEngines || [];
+        const speedRatio = Math.min(1, Math.abs(state.speed) / WARP_SPEEDS[5]);
+        engines.forEach(({ mesh, light }) => {
+            if (mesh && mesh.material && mesh.material.emissive) {
+                mesh.material.emissiveIntensity = 0.5 + speedRatio * 4;
+                mesh.material.opacity = 0.6 + speedRatio * 0.4;
+            }
+            if (light) {
+                light.intensity = speedRatio * 5;
+            }
+        });
     };
 
     /**
@@ -482,16 +531,23 @@ export const createShipControls = (shipGroup) => {
         applyGravity,
         getSpeed: () => state.speed,
         getWarpFactor: () => state.warpLevel,
+        isFineControlActive: () => state.fineControl,
+        setFineControl: (on) => { state.fineControl = !!on; },
+        applyMouseDelta: (dx, dy) => {
+            state.mouseDelta.x += dx;
+            state.mouseDelta.y += dy;
+        },
         setSpeed: (speed) => { state.speed = speed; },
         activateWarpBoost: () => {
             state.warpLevel = 5;
             state.speed = WARP_SPEEDS[5];
         },
-        engageAutopilot: (targetPos, minDistance = 15000000) => {
+        engageAutopilot: (targetPos, minDistance = 15000000, targetObject = null) => {
             state.autopilot.active = true;
             state.autopilot.targetPos = targetPos;
+            state.autopilot.targetObject = targetObject;
             state.autopilot.minDistance = minDistance;
-            console.log('Autopilot: Engaged', targetPos, minDistance);
+            console.log('Autopilot: Engaged', targetPos, minDistance, targetObject?.userData);
         },
         disengageAutopilot: () => {
             state.autopilot.active = false;

@@ -5,6 +5,7 @@ import * as THREE from 'three';
 
 export const createShip = (scene) => {
     const shipGroup = new THREE.Group();
+    shipGroup.userData.impulseEngines = [];
 
     // === MATERIALS ===
     // High-quality materials - couleur argentée d'origine
@@ -156,6 +157,9 @@ export const createShip = (scene) => {
     const impulseLightR = new THREE.PointLight(0xFF4400, 0, 15);
     impulseLightR.position.set(1.5, -1, -24); // Reculé de -13 à -24
     shipGroup.add(impulseLightR);
+
+    shipGroup.userData.impulseEngines.push({ mesh: impulseL, light: impulseLightL });
+    shipGroup.userData.impulseEngines.push({ mesh: impulseR, light: impulseLightR });
 
     // === 4. NACELLES & PYLONS ===
     // Pylons (Angled supports) - RECULÉS AU CUL DU VAISSEAU

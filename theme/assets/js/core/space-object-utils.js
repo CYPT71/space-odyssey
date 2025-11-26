@@ -1,10 +1,11 @@
 // Utilities for handling space objects consistently across systems
+import { OBJECT_TYPES } from '../config/types.js';
 
 export const getObjectType = (ud = {}) => {
-  if (ud.planetData) return 'planet';
-  if (ud.isNebula) return 'nebula';
-  if (ud.isGasCloud || ud.cloudData) return 'gasCloud';
-  if (ud.galaxyData || ud.isGalaxy) return 'galaxy';
+  if (ud.planetData) return OBJECT_TYPES.PLANET;
+  if (ud.isNebula) return OBJECT_TYPES.NEBULA;
+  if (ud.isGasCloud || ud.cloudData) return OBJECT_TYPES.GAS_CLOUD;
+  if (ud.galaxyData || ud.isGalaxy) return OBJECT_TYPES.GALAXY;
   return 'unknown';
 };
 
@@ -12,14 +13,14 @@ export const getObjectName = (obj) => {
   const ud = obj?.userData || {};
   const type = getObjectType(ud);
   switch (type) {
-    case 'planet':
+    case OBJECT_TYPES.PLANET:
       return ud.planetData?.title || ud.planetData?.name || 'Planet';
-    case 'nebula':
-      return ud.tagName || 'Nebula';
-    case 'gasCloud':
-      return ud.categoryName || ud.cloudData?.name || 'Gas Cloud';
-    case 'galaxy':
-      return ud.galaxyData?.name || 'Galaxy';
+    case OBJECT_TYPES.NEBULA:
+      return ud.nebulaName || ud.tagName || 'Nebula';
+    case OBJECT_TYPES.GAS_CLOUD:
+      return ud.cloudName || ud.categoryName || ud.cloudData?.name || 'Gas Cloud';
+    case OBJECT_TYPES.GALAXY:
+      return ud.galaxyName || ud.galaxyData?.name || 'Galaxy';
     default:
       return 'Object';
   }
@@ -45,9 +46,9 @@ export const getDetectionRange = (type) => {
   const DETECTION_RANGE = {
     planet: 500000,
     galaxy: 1500000,
-    gasCloud: 5000000,
-    nebula: 3000000,
-    default: 1000000
+    gasCloud: 12000000, // widened for easier targeting
+    nebula: 12000000,    // widened for easier targeting
+    default: 1500000
   };
   return DETECTION_RANGE[type] || DETECTION_RANGE.default;
 };

@@ -172,6 +172,59 @@ pre {
   width: 350px;
 }
 
+#radar-overlay {
+  position: fixed;
+  right: 20px;
+  top: 80px;
+  width: 240px;
+  height: 240px;
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid #00F0FF;
+  border-radius: 12px;
+  padding: 10px;
+  z-index: 101;
+}
+#radar-overlay.hidden { display: none; }
+#radar-canvas {
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, rgba(0,240,255,0.15) 0%, rgba(0,0,0,0.6) 60%);
+  border-radius: 6px;
+}
+#radar-toggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0,240,255,0.1);
+  border: 1px solid #00F0FF;
+  color: #00F0FF;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-family: monospace;
+}
+
+.terminal-panel {
+  background: radial-gradient(circle at 20% 20%, rgba(0,240,255,0.05), transparent 40%), rgba(0, 10, 20, 0.9);
+  border: 1px solid rgba(0,240,255,0.4);
+  border-radius: 12px;
+  box-shadow: 0 0 25px rgba(0,240,255,0.25);
+  color: #00F0FF;
+  font-family: 'JetBrains Mono', monospace;
+}
+.terminal-panel h3 {
+  margin: 0 0 8px 0;
+  color: #00F0FF;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.terminal-panel button {
+  background: rgba(0,240,255,0.1);
+  border: 1px solid #00F0FF;
+  color: #00F0FF;
+  font-family: 'JetBrains Mono', monospace;
+  cursor: pointer;
+}
+
 #minimap-list {
   flex: 1;
   overflow-y: auto;
@@ -499,7 +552,7 @@ footer {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.85);
+  background: radial-gradient(circle at 20% 20%, rgba(0,240,255,0.08), transparent 40%), rgba(0, 10, 20, 0.92);
   backdrop-filter: blur(15px);
   z-index: 2000;
   /* Above everything */
@@ -509,6 +562,8 @@ footer {
   justify-content: center;
   padding: 2rem;
   transition: opacity 0.3s ease;
+  border: 1px solid rgba(0,240,255,0.25);
+  box-shadow: 0 0 25px rgba(0,240,255,0.25);
 }
 
 #reading-overlay.hidden {
@@ -546,6 +601,21 @@ footer {
   transition: all 0.3s ease;
   text-transform: uppercase;
 }
+#reading-close:hover { background: rgba(123, 97, 255, 0.1); }
+
+#reading-back {
+  background: rgba(0,240,255,0.08);
+  border: 1px solid var(--accent-cyan);
+  color: var(--accent-cyan);
+  font-family: 'JetBrains Mono', monospace;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+#reading-back:hover { background: rgba(0,240,255,0.15); }
 
 #reading-close:hover {
   background: var(--accent-violet);
@@ -664,19 +734,104 @@ footer {
   border: 2px solid #00F0FF;
   box-shadow: 0 0 20px rgba(0,240,255,0.7);
   pointer-events: none;
+  backdrop-filter: blur(2px);
 }
 .tutorial-box {
   position: absolute;
-  max-width: 320px;
-  background: rgba(0,20,40,0.95);
+  width: 420px;
+  background: linear-gradient(135deg, rgba(0,12,20,0.95) 0%, rgba(0,20,40,0.95) 100%);
   border: 1px solid var(--accent-cyan);
-  padding: 16px;
+  padding: 12px;
   color: var(--accent-cyan);
-  box-shadow: 0 0 20px rgba(0,240,255,0.4);
+  box-shadow: 0 0 24px rgba(0,240,255,0.35);
+  font-family: "SFMono-Regular", Menlo, Consolas, monospace;
 }
-.tutorial-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
-.tutorial-actions button { background: transparent; color: var(--accent-cyan); border: 1px solid var(--accent-cyan); cursor: pointer; padding: 6px 10px; }
+.terminal-chrome {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #7ef8ff;
+  text-transform: uppercase;
+}
+.terminal-chrome .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 8px rgba(255,255,255,0.25);
+}
+.terminal-chrome .dot.red { background: #ff5f56; }
+.terminal-chrome .dot.yellow { background: #ffbd2e; }
+.terminal-chrome .dot.green { background: #27c93f; }
+.terminal-label { margin-left: 6px; }
+.tutorial-body h3 {
+  margin: 0 0 4px 0;
+  color: #00f0ff;
+}
+.tutorial-body p {
+  margin: 0 0 6px 0;
+  color: #9adfff;
+  font-size: 13px;
+}
+.terminal-log {
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(0,240,255,0.25);
+  padding: 10px;
+  color: #7ef8ff;
+  font-size: 12px;
+  min-height: 120px;
+  white-space: pre-wrap;
+  margin: 0;
+}
+.tutorial-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+.tutorial-actions button { background: rgba(0,240,255,0.08); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); cursor: pointer; padding: 6px 10px; }
 .tutorial-actions button:hover { background: var(--accent-cyan); color: #000; }
+
+.ap-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  backdrop-filter: blur(6px);
+  z-index: 9998;
+}
+.ap-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(145deg, rgba(0,12,20,0.96), rgba(0,26,50,0.9));
+  border: 1px solid #00F0FF;
+  box-shadow: 0 0 30px rgba(0,240,255,0.35);
+  padding: 14px;
+  min-width: 360px;
+  color: #b6faff;
+  font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+  z-index: 9999;
+}
+.ap-chrome { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 11px; letter-spacing: 0.08em; color: #7ef8ff; text-transform: uppercase; }
+.ap-chrome .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px rgba(255,255,255,0.25); }
+.ap-chrome .dot.red { background: #ff5f56; }
+.ap-chrome .dot.yellow { background: #ffbd2e; }
+.ap-chrome .dot.green { background: #27c93f; }
+.ap-label { margin-left: 6px; }
+.ap-body h3 { margin: 0 0 4px 0; color: #00f0ff; }
+.ap-body p { margin: 0 0 8px 0; color: #9adfff; font-size: 13px; }
+.ap-console {
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(0,240,255,0.25);
+  padding: 10px;
+  color: #7ef8ff;
+  font-size: 12px;
+  min-height: 90px;
+  white-space: pre-wrap;
+  margin: 0;
+}
+.ap-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+.ap-actions button { background: rgba(0,240,255,0.08); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); cursor: pointer; padding: 8px 12px; }
+.ap-actions button:hover { background: var(--accent-cyan); color: #000; }
 
 /* Breadcrumb */
 #breadcrumb {

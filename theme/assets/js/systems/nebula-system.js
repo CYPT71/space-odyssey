@@ -5,7 +5,9 @@
  */
 
 import * as THREE from 'three';
-import { CSS2DObject } from '../infrastructure/css2d-renderer.js';
+import { createVolumetricCloud, hashStringToColor } from './volumetric-cloud-factory.js';
+import { NEBULA_VISUAL } from '../config/visual-config.js';
+import { applyPulseScale } from '../effects/visual-effects.js';
 
 /**
  * Creates a nebula (particle cloud) for a tag cluster
@@ -24,93 +26,63 @@ import { CSS2DObject } from '../infrastructure/css2d-renderer.js';
  * @param {THREE.Color} [parentColor] - Base color from parent (optional)
  * @returns {THREE.Points} The nebula particle system
  */
-export function createNebula(scene, center, tagName, postCount, parentColor = null) {
-    // Density increases for inner pockets (smaller radius, same or more particles)
-    const particleCount = Math.min(postCount * 200, 2000);
-    const radius = 50000 + (postCount * 5000);
-
-    // Create geometry
-    const geometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(particleCount * 3);
-    const colors = new Float32Array(particleCount * 3);
-
-    // Determine color: use parent color with shift, or hash if root
-    let baseColor;
-    if (parentColor) {
-        // Shift hue slightly for "pocket" effect
-        const hsl = {};
-        parentColor.getHSL(hsl);
-        baseColor = new THREE.Color().setHSL((hsl.h + 0.05) % 1.0, hsl.s, hsl.l + 0.1); // Lighter and shifted
-    } else {
-        baseColor = hashStringToColor(tagName);
-    }
-
-    // Generate particles in spherical distribution
-    for (let i = 0; i < particleCount; i++) {
-        const i3 = i * 3;
-
-        // Spherical distribution (more dense core)
-        const theta = Math.random() * Math.PI * 2;
-        const phi = Math.acos(2 * Math.random() - 1);
-        const r = radius * Math.pow(Math.random(), 0.4); // More center-weighted
-
-        positions[i3] = r * Math.sin(phi) * Math.cos(theta);
-        positions[i3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-        positions[i3 + 2] = r * Math.cos(phi);
-
-        // Color variation
-        colors[i3] = baseColor.r + (Math.random() - 0.5) * 0.1;
-        colors[i3 + 1] = baseColor.g + (Math.random() - 0.5) * 0.1;
-        colors[i3 + 2] = baseColor.b + (Math.random() - 0.5) * 0.1;
-    }
-
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-    // Create material
-    const material = new THREE.PointsMaterial({
+const NEBULA_CONFIG = Object.freeze({
+    particleMultiplier: NEBULA_VISUAL.particleMultiplier,
+    particleCap: NEBULA_VISUAL.particleCap,
+    baseRadius: NEBULA_VISUAL.baseRadius,      // Enlarged for easier targeting
+    radiusPerUnit: NEBULA_VISUAL.radiusPerUnit,    // Scales up faster with posts count
+    distributionPower: NEBULA_VISUAL.distributionPower,
+    baseColorFn: (name, parentColor) => {
+        if (parentColor) {
+            const hsl = {};
+            parentColor.getHSL(hsl);
+            return new THREE.Color().setHSL((hsl.h + 0.05) % 1.0, hsl.s, Math.min(1, hsl.l + 0.1));
+        }
+        return hashStringToColor(name);
+    },
+    colorJitterFn: (baseColor, _distRatio, scratch) => {
+        scratch.copy(baseColor);
+        scratch.r += (Math.random() - 0.5) * 0.1;
+        scratch.g += (Math.random() - 0.5) * 0.1;
+        scratch.b += (Math.random() - 0.5) * 0.1;
+        return scratch;
+    },
+    material: {
         size: 4000,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.6, // Dense
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        sizeAttenuation: true
+        opacity: 0.6
+    },
+    labelClass: 'planet-label',
+    labelTextFn: (name) => (name || 'Nebula').toUpperCase(),
+    labelHeightFn: (radius) => radius * 0.8,
+    spaceType: 'nebula'
+});
+
+export function createNebula(scene, center, tagName, postCount, parentColor = null) {
+    const nebula = createVolumetricCloud({
+        center,
+        name: tagName,
+        count: postCount,
+        config: NEBULA_CONFIG,
+        parentColor,
+        extraUserData: {
+            isNebula: true,
+            isGalaxy: false,
+            spaceType: 'nebula',
+            nebulaName: tagName,
+            tagName: tagName,
+            postCount: postCount
+        }
     });
 
-    const nebula = new THREE.Points(geometry, material);
-    nebula.position.copy(center);
-
-    // Store metadata
-    nebula.userData = {
-        isNebula: true,
-        tagName: tagName,
-        postCount: postCount,
-        center: center.clone(),
-        baseColor: baseColor // Store for children
-    };
-
-    // Add a label for the nebula
-    const div = document.createElement('div');
-    div.className = 'planet-label';
-    div.textContent = (tagName || 'Nebula').toUpperCase();
-    const label = new CSS2DObject(div);
-    label.position.set(0, radius * 0.8, 0);
-    nebula.add(label);
-
     // VISUALIZE FILES (POSTS)
-    // If this nebula has posts, render them as bright stars inside
-    // We don't have the posts array passed here directly in the signature, 
-    // but the caller usually attaches it to userData. 
-    // We'll add a helper to visualize them if called.
     nebula.visualizePosts = (posts) => {
         if (!posts || posts.length === 0) return;
 
+        const radius = nebula.userData?.radius || (NEBULA_CONFIG.baseRadius + postCount * NEBULA_CONFIG.radiusPerUnit);
         const fileGeo = new THREE.BufferGeometry();
         const filePos = new Float32Array(posts.length * 3);
 
         posts.forEach((post, i) => {
-            // Random position within nebula
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos(2 * Math.random() - 1);
             const r = radius * 0.6 * Math.cbrt(Math.random()); // Inner 60%
@@ -132,49 +104,8 @@ export function createNebula(scene, center, tagName, postCount, parentColor = nu
         nebula.add(filePoints);
     };
 
+    scene.add(nebula);
     return nebula;
-}
-
-/**
- * Hash a string to a consistent color
- * @param {string} str - String to hash
- * @returns {Object} RGB color object
- */
-function hashStringToColor(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-
-    // Convert to HSL for better color distribution
-    const h = (hash % 360) / 360;
-    const s = 0.7; // High saturation
-    const l = 0.6; // Medium lightness
-
-    // HSL to RGB
-    const hslToRgb = (h, s, l) => {
-        let r, g, b;
-        if (s === 0) {
-            r = g = b = l;
-        } else {
-            const hue2rgb = (p, q, t) => {
-                if (t < 0) t += 1;
-                if (t > 1) t -= 1;
-                if (t < 1 / 6) return p + (q - p) * 6 * t;
-                if (t < 1 / 2) return q;
-                if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-                return p;
-            };
-            const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-            const p = 2 * l - q;
-            r = hue2rgb(p, q, h + 1 / 3);
-            g = hue2rgb(p, q, h);
-            b = hue2rgb(p, q, h - 1 / 3);
-        }
-        return { r, g, b };
-    };
-
-    return hslToRgb(h, s, l);
 }
 
 /**
@@ -237,6 +168,8 @@ export function updateNebulae(nebulae, delta) {
         if (nebula.userData?.isNebula) {
             // Slow rotation around Y axis
             nebula.rotation.y += delta * 0.05;
+            const time = Date.now() * 0.001;
+            applyPulseScale(nebula, time, 0.8, 0.08);
         }
     });
 }

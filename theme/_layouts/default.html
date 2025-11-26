@@ -126,6 +126,14 @@
     </div>
 
     <div class="control-group">
+      <label>CYCLE TARGET</label>
+      <div class="control-input">
+        <button class="key-button" data-action="targetCycle" id="bind-target-cycle">N</button>
+        <span style="color: #888;">Cycle overlapping targets</span>
+      </div>
+    </div>
+
+    <div class="control-group">
       <label>MOVE UP</label>
       <div class="control-input">
         <button class="key-button" data-action="moveUp">SPACE</button>
@@ -178,6 +186,7 @@
       <button id="warp-boost" class="warp-boost-btn">⚡ ENGAGE WARP 5</button>
       <button id="return-base" class="warp-boost-btn" style="border-color: #FF3300; color: #FF3300;">🏠 RETURN TO
         BASE</button>
+      <button id="fine-control" class="warp-boost-btn" style="border-color: #888; color: #00F0FF;">Fine Pilot</button>
     </div>
   </div>
 
@@ -185,6 +194,12 @@
   <div id="hud-minimap">
     <h3>📡 KNOWN OBJECTS</h3>
     <div id="minimap-list"></div>
+  </div>
+
+  <!-- Radar Overlay -->
+  <div id="radar-overlay" class="hidden terminal-panel">
+    <canvas id="radar-canvas" width="220" height="220"></canvas>
+    <button id="radar-toggle">☰</button>
   </div>
 
   <!-- Compass HUD -->
@@ -210,8 +225,15 @@
     <div class="tutorial-backdrop"></div>
     <div class="tutorial-highlight"></div>
     <div class="tutorial-box">
-      <h3 id="tutorial-title">Welcome</h3>
-      <p id="tutorial-text">Use the controls to navigate.</p>
+      <div class="terminal-chrome">
+        <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+        <span class="terminal-label">FLIGHT SCHOOL // PILOT CONSOLE</span>
+      </div>
+      <div class="tutorial-body">
+        <h3 id="tutorial-title">Welcome</h3>
+        <p id="tutorial-text">Use the controls to navigate.</p>
+        <pre id="tutorial-terminal" class="terminal-log">ship&gt; awaiting input...</pre>
+      </div>
       <div class="tutorial-actions">
         <button id="tutorial-prev">◀ Prev</button>
         <button id="tutorial-next">Next ▶</button>
@@ -225,7 +247,10 @@
   <div id="reading-overlay">
     <div class="reading-header">
       <h3 class="reading-title">INCOMING TRANSMISSION</h3>
-      <button id="reading-close">✕ CLOSE</button>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button id="reading-back">◀ BACK</button>
+        <button id="reading-close">✕ CLOSE</button>
+      </div>
     </div>
     <div id="reading-content">
       {{ content }}
@@ -259,6 +284,17 @@
             path: "{{ post.path | escape }}",
               dir: "{{ post.dir | escape }}"
     } {% unless forloop.last %}, {% endunless %}
+    {% endfor %}
+    {% assign content_pages = site.static_files | where_exp: 'f', 'f.path contains "content/_pages/"' | where_exp: 'f', 'f.extname == ".md"' %}
+    {% for f in content_pages %},
+    {
+      title: "{{ f.name | split: '.' | first | escape }}",
+      tiitle: "",
+      url: "{{ f.path | replace: 'content/_pages', '' | replace: '.md', '' | relative_url }}",
+      name: "{{ f.name | escape }}",
+      path: "{{ f.path | remove_first: '/' | escape }}",
+      dir: "{{ f.dir | escape }}"
+    }
     {% endfor %}
     ];
 

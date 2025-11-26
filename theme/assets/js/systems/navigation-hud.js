@@ -16,6 +16,7 @@ export function createNavigationSystem(container, camera) {
     const trackedPlanets = []; // Array of planets to track
     let waypointElement = null; // Single waypoint element
     let centralArrow = null; // Central direction arrow
+    let nearestArrow = null; // Arrow pointing to nearest tracked object
 
     // Create HUD container if not exists
     let hudLayer = document.getElementById('hud-layer');
@@ -33,7 +34,7 @@ export function createNavigationSystem(container, camera) {
         container.appendChild(hudLayer);
     }
 
-    // Central direction arrow (always visible)
+    // Central direction arrow (always visible) + nearest-target arrow
     const centerArrow = document.createElement('div');
     centerArrow.className = 'nav-center-arrow';
     // Arrow style (pointing up by default)
@@ -50,6 +51,22 @@ export function createNavigationSystem(container, camera) {
     hudLayer.appendChild(centerArrow);
     // Store reference
     centralArrow = centerArrow;
+
+    nearestArrow = document.createElement('div');
+    nearestArrow.className = 'nav-nearest-arrow';
+    nearestArrow.style.position = 'absolute';
+    nearestArrow.style.left = '50%';
+    nearestArrow.style.top = '50%';
+    nearestArrow.style.transform = 'translate(-50%, -50%) rotate(0deg)';
+    nearestArrow.style.width = '0';
+    nearestArrow.style.height = '0';
+    nearestArrow.style.borderLeft = '14px solid transparent';
+    nearestArrow.style.borderRight = '14px solid transparent';
+    nearestArrow.style.borderBottom = '24px solid #00F0FF';
+    nearestArrow.style.zIndex = '12';
+    nearestArrow.style.opacity = '0.7';
+    nearestArrow.style.pointerEvents = 'none';
+    hudLayer.appendChild(nearestArrow);
 
 
     /**
@@ -200,6 +217,23 @@ export function createNavigationSystem(container, camera) {
 
             waypointElement.querySelector('.nav-info').style.display = 'block';
             waypointElement.querySelector('.nav-arrow').style.display = 'none';
+        }
+
+        // Nearest arrow to closest tracked object
+        let nearest = null;
+        trackedPlanets.forEach(p => {
+            const d = shipPosition.distanceTo(p.position);
+            if (d < minDist) {
+                minDist = d;
+                nearest = p;
+            }
+        });
+        if (nearest && nearestArrow) {
+            const np = nearest.position.clone();
+            np.project(camera);
+            const angle = Math.atan2(np.y, np.x);
+            nearestArrow.style.transform = `translate(-50%, -50%) rotate(${-(angle * 180 / Math.PI) + 90}deg)`;
+            nearestArrow.style.opacity = '0.7';
         }
     };
 

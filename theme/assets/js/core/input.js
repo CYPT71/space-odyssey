@@ -23,6 +23,11 @@ export function createInputSystem(systems) {
         scannerSystem
     } = systems;
 
+    // Shared history buffer for the reading overlay (guaranteed defined)
+    if (!window.readingHistory) window.readingHistory = [];
+    // Manual target handle (HUD uses this when set)
+    if (typeof window.manualTarget === 'undefined') window.manualTarget = null;
+
     const scratchVector = new THREE.Vector3();
     let controls = loadControlsShared();
 
@@ -473,6 +478,16 @@ approach: ${targetMeta.approach || 'standard'}</pre>
             if (!shipControls.isFineControlActive()) return;
             if (uiManager.isReadingMode) return;
             shipControls.applyMouseDelta(e.movementX, e.movementY);
+        });
+
+        // Clicking anywhere (except the fine-control button) disengages fine control
+        window.addEventListener('click', (e) => {
+            const fineBtn = document.getElementById('fine-control');
+            const isToggleButton = fineBtn && fineBtn.contains(e.target);
+            if (isToggleButton) return;
+            if (shipControls.isFineControlActive()) {
+                shipControls.setFineControl(false);
+            }
         });
 
         // Fine control toggle only via button

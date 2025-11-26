@@ -44,11 +44,11 @@ export const getLabeledName = (obj) => {
 
 export const getDetectionRange = (type) => {
   const DETECTION_RANGE = {
-    planet: 500000,
-    galaxy: 1500000,
-    gasCloud: 12000000, // widened for easier targeting
-    nebula: 12000000,    // widened for easier targeting
-    default: 1500000
+    planet: 2000000,
+    galaxy: 50000000,
+    gasCloud: 50000000, // widened for easier targeting
+    nebula: 50000000,    // widened for easier targeting
+    default: 50000000
   };
   return DETECTION_RANGE[type] || DETECTION_RANGE.default;
 };

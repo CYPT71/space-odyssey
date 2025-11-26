@@ -4,7 +4,7 @@ email: contact@cypride.dev
 description: "Deep Space Observatory Terminal - Portfolio & Projects"
 
 # URLs
-baseurl: "/space-odyssey"
+baseurl: "/space-odyssey.github.io"
 
 # Theme configuration (paths relative to repository root)
 layouts_dir: theme/_layouts

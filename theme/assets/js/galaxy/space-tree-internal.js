@@ -42,7 +42,17 @@ const HIERARCHY_NODE_PROPS = Object.freeze({
     }
 });
 
-const normalizeInput = (path, url) => ({ path: path || '', url: url || '' });
+const BASE_URL = (typeof window !== 'undefined' && window.siteBase) ? (window.siteBase.replace(/\/+$/, '') || '') : '';
+const stripBase = (val = '') => {
+    if (!BASE_URL) return val;
+    return val.startsWith(BASE_URL) ? val.slice(BASE_URL.length) || '/' : val;
+};
+
+const normalizeInput = (path, url) => {
+    const safePath = path || '';
+    const safeUrl = stripBase(url || '');
+    return { path: safePath, url: safeUrl };
+};
 
 /**
  * Creates a classifier that decides whether a file belongs to a collection and

@@ -1,223 +1,32 @@
-# Architecture Documentation
+# Space Odyssey Architecture
 
-## 📐 System Architecture
+## Layout & Delivery
+- **Theme gem** lives in `_tech/theme` and is consumed via `theme: jekyll-theme-space-odyssey`.
+- Assets are served directly from `_tech/theme/assets`, no copying into project root is required.
+- Native WASM binaries are expected in `_tech/native/*.wasm`; JS fallbacks keep runtime working when binaries are absent.
 
-### Overview
-The Antigravity project follows a **Clean Architecture** pattern with clear separation of concerns:
+## Core Systems (JS)
+- **Galaxy/Nebula parsing**: `_tech/theme/assets/js/galaxy/space-tree-internal.js` builds the content graph (galaxies for pages, nebulae for posts). Renderer choice is controlled by `HIERARCHY_NODE_PROPS`.
+- **Object management**: `_tech/theme/assets/js/core/space-object-utils.js` and friends manage spatial data (octree, physics helpers).
+- **Rendering & HUD**: systems under `_tech/theme/assets/js/systems` (scanner, audio, navigation HUD, gas-cloud, etc.).
+- **Workers**: `_tech/theme/assets/js/workers/parse-worker.js` offloads parsing; it prefers WASM parser when available.
 
-```
-┌─────────────────────────────────────────────┐
-│         space-scene.js (Orchestrator)       │
-│  Initializes and coordinates all modules   │
-└─────────────────────────────────────────────┘
-                    │
-        ┌───────────┼───────────┐
-        │           │           │
-        ▼           ▼           ▼
-   ┌────────┐  ┌────────┐  ┌────────┐
-   │ Core   │  │Systems │  │Entities│
-   └────────┘  └────────┘  └────────┘
-```
+## Native / WASM
+- **fast-math**: `_tech/native/cpp/fast_math.cpp` → `_tech/native/fast-math.wasm`, wrapped by `_tech/theme/assets/js/native/fast-math.js` (dist3/lerp/clamp/smoothstep/dot/mag).
+- **fast-parser**: `_tech/native/cpp/fast_parser.cpp` → `_tech/native/fast-parser.wasm`, wrapped by `_tech/theme/assets/js/native/fast-parser.js`. Currently logs counts and falls back to JS parse.
+- Build helper: `_tech/bin/setup_and_run.sh` optionally builds WASM via `emcc` when available.
 
-### Directory Structure
+## Testing & CI
+- Jest lives under `_tech/tests`, with extensive Three.js mocks in `__mocks__/three.js`. Coverage thresholds are 99% global.
+- CI runs Jest then Jekyll build (`_tech/package.json` scripts).
+- Babel vendor shim is auto-patched via `scripts/patch-babel-vendor.js` to satisfy Jest dependencies.
 
-```
-theme/assets/js/
-├── core/               # Core game loop modules (NEW)
-│   ├── rendering.js    # Rendering logic
-│   ├── physics.js      # Physics/update loop
-│   ├── input.js        # Input handling & events
-│   └── hud-utils.js    # HUD utilities
-│
-├── systems/            # Game systems
-│   ├── ship-controls.js
-│   ├── camera-controller.js
-│   ├── audio.js
-│   ├── particles.js
-│   ├── navigation-hud.js
-│   └── ...
-│
-├── entities/           # Game entities
-│   ├── ship-model.js
-│   └── procedural-planets.js
-│
-├── infrastructure/     # Scene setup
-│   └── scene-setup.js
-│
-├── config/             # Configuration
-│   └── constants.js
-│
-└── space-scene.js      # Main orchestrator
-```
+## Observability
+- `core/profiler.js` exposes `startMark/endMark`. Parsing now emits timing marks (`space-parse`, `space-parse-classify`, `space-parse-hierarchy`).
+- Add more marks around hot paths (physics, HUD updates) as needed; keep logs concise to avoid console noise.
 
-## 🏗️ Design Patterns
-
-### 1. **Module Pattern**
-Each system is a self-contained module with a clear public API:
-
-```javascript
-export function createShipControls(shipGroup) {
-    // Private state
-    const state = { ... };
-    
-    // Private functions
-    const applyRotation = () => { ... };
-    
-    // Public API
-    return {
-        update,
-        getSpeed,
-        setSpeed
-    };
-}
-```
-
-### 2. **Dependency Injection**
-Systems receive their dependencies explicitly:
-
-```javascript
-const physicsSystem = createPhysicsSystem({
-    shipControls,
-    audioSystem,
-    cameraController,
-    // ... all dependencies
-});
-```
-
-### 3. **Single Responsibility**
-Each module has ONE clear purpose:
-- `rendering.js` → Render frames
-- `physics.js` → Update game state
-- `input.js` → Handle user input
-- `hud-utils.js` → Update HUD elements
-
-## 🔄 Data Flow
-
-```
-User Input → Input System → Ship Controls → Physics System → Rendering System → Screen
-                ↓                                   ↓
-            Audio System                    Camera Controller
-```
-
-## 🧪 Testing Strategy
-
-### Unit Tests
-Test individual modules in isolation:
-
-```javascript
-// Example: ship-controls.test.js
-import { createShipControls } from './ship-controls.js';
-
-test('should increase warp level on forward key', () => {
-    const mockShip = createMockShip();
-    const controls = createShipControls(mockShip);
-    
-    controls.update(false);
-    // Assert warp level increased
-});
-```
-
-### Integration Tests
-Test module interactions:
-
-```javascript
-// Example: physics-integration.test.js
-test('physics system updates all subsystems', () => {
-    const systems = createMockSystems();
-    const physics = createPhysicsSystem(systems);
-    
-    physics.update(0.016); // 60 FPS
-    // Assert all systems were updated
-});
-```
-
-## 📝 Code Conventions
-
-### Naming
-- **Functions**: `camelCase` (e.g., `createShipControls`)
-- **Constants**: `UPPER_SNAKE_CASE` (e.g., `MAX_WARP_SPEED`)
-- **Files**: `kebab-case` (e.g., `ship-controls.js`)
-- **Classes**: `PascalCase` (e.g., `ParticleSystem`)
-
-### File Structure
-```javascript
-/**
- * @fileoverview Brief description
- * @author CYPT71
- * @description Detailed description
- */
-
-// Imports
-import ...
-
-// Constants
-const CONFIG = { ... };
-
-// Private functions
-const helperFunction = () => { ... };
-
-// Public API
-export function createModule() { ... }
-```
-
-### Comments
-- Use JSDoc for public APIs
-- Explain **why**, not **what**
-- Keep comments concise
-
-## 🔒 Security Best Practices
-
-### 1. No Dynamic Code Execution
-❌ Never use: `eval()`, `Function()`, `exec()`
-✅ Use: Static imports, configuration objects
-
-### 2. Input Validation
-All user input is validated before use:
-
-```javascript
-const sanitizeInput = (input) => {
-    return input.replace(/[<>]/g, '');
-};
-```
-
-### 3. Pre-commit Hooks
-Automatically check for:
-- Secrets/API keys
-- Large files
-- Merge conflicts
-- Code style
-
-## 🚀 Build & Deploy
-
-### Development
-```bash
-# Install dependencies
-bundle install
-
-# Run local server
-bundle exec jekyll serve
-
-# Pre-commit setup
-pip install pre-commit
-pre-commit install
-```
-
-### Production
-```bash
-# Build static site
-bundle exec jekyll build
-
-# Output: _site/ (gitignored, generated by CI)
-```
-
-### CI/CD Pipeline
-1. Run tests
-2. Run pre-commit hooks
-3. Build `_site/`
-4. Deploy to hosting
-
-## 📚 Further Reading
-
-- [Clean Code](https://www.amazon.com/Clean-Code-Handbook-Software-Craftsmanship/dp/0132350882) by Robert C. Martin
-- [Three.js Documentation](https://threejs.org/docs/)
-- [JavaScript Design Patterns](https://www.patterns.dev/)
+## Next Steps
+- Swap more distance/curve math to the fast-math wrapper.
+- Expand fast-parser to emit the full tree in WASM and switch the worker to prefer it when present.
+- Keep docs in `_tech/docs` alongside setup/run instructions.
+- Document wiki structure: pages for content graph, rendering pipeline, WASM build notes, and CI.

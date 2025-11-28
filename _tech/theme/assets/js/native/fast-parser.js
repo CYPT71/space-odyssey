@@ -2,7 +2,7 @@
  * @fileoverview Optional WASM-assisted parser entrypoint.
  * Falls back to JS space-tree parser; WASM currently only returns a file count placeholder.
  */
-import { parseSpaceTree } from '../galaxy/space-tree-internal.js';
+import { parseFileSystem as parseSpaceTree } from '../galaxy/space-tree-internal.js';
 
 const wasmPath = '/_tech/native/fast-parser.wasm';
 let wasm = null;

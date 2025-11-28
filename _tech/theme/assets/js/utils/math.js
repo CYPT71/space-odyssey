@@ -1,8 +1,8 @@
 /**
- * @fileoverview Mathematical utilities
- * @author CYPT71
- * @version 2.0.0
+ * @fileoverview Mathematical utilities with optional WASM acceleration.
+ * Uses fast-math wrappers when available; falls back to JS.
  */
+import { dist3, lerpFast, clampFast, smoothstepFast, mag3Fast } from '../native/fast-math.js';
 
 /**
  * Mathematical utility functions
@@ -16,7 +16,7 @@ export class MathUtils {
      * @returns {number} Clamped value
      */
     static clamp(value, min, max) {
-        return Math.min(Math.max(value, min), max);
+        return clampFast(value, min, max);
     }
 
     /**
@@ -27,7 +27,7 @@ export class MathUtils {
      * @returns {number} Interpolated value
      */
     static lerp(start, end, t) {
-        return start + (end - start) * this.clamp(t, 0, 1);
+        return lerpFast(start, end, t);
     }
 
     /**
@@ -88,10 +88,7 @@ export class MathUtils {
      * @returns {number} Distance
      */
     static distance3D(p1, p2) {
-        const dx = p2.x - p1.x;
-        const dy = p2.y - p1.y;
-        const dz = p2.z - p1.z;
-        return Math.sqrt(dx * dx + dy * dy + dz * dz);
+        return dist3(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
     }
 
     /**
@@ -102,8 +99,7 @@ export class MathUtils {
      * @returns {number}
      */
     static smoothstep(edge0, edge1, x) {
-        const t = this.clamp((x - edge0) / (edge1 - edge0), 0, 1);
-        return t * t * (3 - 2 * t);
+        return smoothstepFast(edge0, edge1, x);
     }
 
     /**
@@ -114,5 +110,14 @@ export class MathUtils {
      */
     static randomRange(min, max) {
         return this.random(min, max);
+    }
+
+    /**
+     * Magnitude of a 3D vector
+     * @param {Object} p - Point {x,y,z}
+     * @returns {number} Length
+     */
+    static magnitude3D(p) {
+        return mag3Fast(p.x, p.y, p.z);
     }
 }

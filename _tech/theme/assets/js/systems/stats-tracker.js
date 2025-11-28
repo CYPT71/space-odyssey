@@ -2,6 +2,7 @@
  * @fileoverview Travel statistics tracker
  * @author CYPT71
  */
+import { dist3 } from '../native/fast-math.js';
 
 export const createStatsTracker = () => {
     // Load saved stats or initialize
@@ -27,11 +28,11 @@ export const createStatsTracker = () => {
     const lastPosition = { x: 0, y: 0, z: 0 };
 
     const update = (shipPosition, currentSpeed, warpLevel) => {
-        // Calculate distance traveled
-        const dx = shipPosition.x - lastPosition.x;
-        const dy = shipPosition.y - lastPosition.y;
-        const dz = shipPosition.z - lastPosition.z;
-        const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        // Calculate distance traveled via WASM-accelerated helper (fallback to JS)
+        const distance = dist3(
+            shipPosition.x, shipPosition.y, shipPosition.z,
+            lastPosition.x, lastPosition.y, lastPosition.z
+        );
 
         stats.totalDistance += distance;
 

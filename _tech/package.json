@@ -39,6 +39,9 @@
     "setupFilesAfterEnv": [
       "<rootDir>/tests/jest.setup.js"
     ],
+    "modulePathIgnorePatterns": [
+      "<rootDir>/_site"
+    ],
     "testMatch": [
       "**/_tech/tests/**/*.test.js"
     ],

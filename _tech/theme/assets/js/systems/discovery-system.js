@@ -2,6 +2,7 @@
  * @fileoverview Discovery system for planets
  * @author CYPT71
  */
+import { dist3 } from '../native/fast-math.js';
 
 export const createDiscoverySystem = () => {
     const DISCOVERY_KEY = 'discoveredPlanets';
@@ -31,11 +32,11 @@ export const createDiscoverySystem = () => {
             const name = planetData.name || planetData.title;
             if (!name || discovered.has(name)) return;
 
-            // Calculate distance
-            const dx = planet.position.x - shipPosition.x;
-            const dy = planet.position.y - shipPosition.y;
-            const dz = planet.position.z - shipPosition.z;
-            const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            // Calculate distance (WASM-accelerated when available)
+            const distance = dist3(
+                planet.position.x, planet.position.y, planet.position.z,
+                shipPosition.x, shipPosition.y, shipPosition.z
+            );
 
             if (distance < DISCOVERY_RANGE) {
                 discovered.add(name);

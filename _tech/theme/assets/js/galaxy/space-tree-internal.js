@@ -3,6 +3,7 @@
  * @author CYPT71
  * @version 2.0.0
  */
+import { startMark, endMark } from '../core/profiler.js';
 
 /**
  * Patterns to exclude technical files
@@ -250,6 +251,8 @@ const noop = () => {};
  * @returns {Object} Hierarchical structure with galaxies and gas clouds
  */
 export const parseFileSystem = (files) => {
+    startMark('space-parse');
+    startMark('space-parse-classify');
     const tree = {
         root: {
             files: [],
@@ -298,6 +301,7 @@ export const parseFileSystem = (files) => {
         { key: 'pages', test: isContentFile },
         { key: 'posts', test: isPostsPost }
     ]);
+    endMark('space-parse-classify');
 
     reject.forEach(path => console.log('❌ Rejected:', path));
     console.log(`✅ Accepted ${buckets.pages.length} pages and ${buckets.posts.length} posts`);
@@ -419,7 +423,9 @@ export const parseFileSystem = (files) => {
         });
     };
 
+    startMark('space-parse-hierarchy');
     processHierarchies(hierarchyConfigs);
+    endMark('space-parse-hierarchy');
 
     // Mirror posts into a galaxy bucket named "posts" to satisfy navigation/tests
     if (buckets.posts.length > 0) {
@@ -433,6 +439,10 @@ export const parseFileSystem = (files) => {
         });
     }
 
+    const total = endMark('space-parse');
+    if (total?.duration) {
+        console.log('⏱ parse duration ms', Number(total.duration.toFixed(3)));
+    }
     console.log('🌳 Parsed tree', tree);
 
     return tree;
@@ -489,3 +499,6 @@ export const countPlanets = (galaxy) => {
 
     return count;
 };
+
+// Preserve legacy export name expected by WASM wrapper
+export const parseSpaceTree = parseFileSystem;

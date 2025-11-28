@@ -7,6 +7,11 @@ title: MISSION LOGS
 
 Relevé séquentiel des interventions sur le secteur.
 
+## [SIGNAL] DISPONIBLE
+- Rôle ciblé : DevSecOps / SRE / Platform Engineer
+- Contrat : Remote ou hybride Europe, FR/EN
+- Missions : sécurisation, observabilité, fiabilité produit, automatisation CI/CD
+
 ## [LOG-202X] :: SECTEUR [CONFIDENTIAL]
 **STATUT** : EN COURS
 **ROLE** : LEAD SRE

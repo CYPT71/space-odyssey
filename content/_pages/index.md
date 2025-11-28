@@ -9,7 +9,7 @@ permalink: /
 **IDENTITY**: CYPRIEN TAÏB
 **ROLE**: OBSERVER [DEVSECOPS / SRE]
 **LOCATION**: LOW ORBIT
-**STATUS**: ACTIVE
+**STATUS**: AVAILABLE — OPEN TO DEVSECOPS / SRE MISSIONS (REMOTE/HYBRID EU)
 
 ---
 
@@ -17,6 +17,11 @@ permalink: /
 
 Bienvenue sur le terminal de contrôle.
 Ce nœud observe et maintient les systèmes vivants : infrastructures critiques, clusters en orbite et flux de données.
+
+### [SIGNAL: HIRING]
+- DevSecOps / SRE / Platform Engineering
+- Remote ou hybride (Europe) | Français / English
+- Contact direct : contact@cypride.dev
 
 ### [QUICK ACCESS]
 

@@ -49,7 +49,7 @@ export function updateMinimap(shipGroup, galaxyManager, frameCount) {
     const loadState = () => {
         try { const raw = localStorage.getItem('minimapState'); return raw ? JSON.parse(raw) : null; } catch { return null; }
     };
-    const saveState = (st) => { try { localStorage.setItem('minimapState', JSON.stringify(st)); } catch { } };
+    const saveState = (st) => { try { localStorage.setItem('minimapState', JSON.stringify(st)); } catch (_) { /* ignore storage errors */ } };
     window.minimapState = window.minimapState || loadState() || { galaxiesCollapsed: false, gasCollapsed: false, galaxyCollapse: {}, cloudCollapse: {} };
     window.minimapState.galaxyCollapse = window.minimapState.galaxyCollapse || {};
     window.minimapState.cloudCollapse = window.minimapState.cloudCollapse || {};

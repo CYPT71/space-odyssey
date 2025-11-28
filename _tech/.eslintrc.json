@@ -1,0 +1,22 @@
+{
+  "root": true,
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2021": true
+  },
+  "extends": ["eslint:recommended"],
+  "parserOptions": {
+    "sourceType": "module",
+    "ecmaVersion": 2022
+  },
+  "ignorePatterns": [
+    "coverage/",
+    "node_modules/",
+    "theme/assets/js/space-scene.js"
+  ],
+  "rules": {
+    "no-unused-vars": ["warn", { "args": "none", "ignoreRestSiblings": true }],
+    "no-console": "off"
+  }
+}

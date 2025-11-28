@@ -14,8 +14,6 @@ import * as THREE from 'three';
  * @returns {THREE.Line} The trail line
  */
 function createTrail(start, end, color) {
-    const points = [];
-
     // Create curved path between planets (Catmull-Rom spline)
     const midPoint = new THREE.Vector3()
         .addVectors(start, end)

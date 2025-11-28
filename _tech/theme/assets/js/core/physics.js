@@ -25,8 +25,7 @@ export function createPhysicsSystem(systems) {
         scannerSystem,
         galaxyManager,
         uiManager,
-        updateLighting,
-        clock
+        updateLighting
     } = systems;
     const discovered = new Set();
     let selectionHalo = null;
@@ -63,8 +62,6 @@ export function createPhysicsSystem(systems) {
      * @param {number} delta - Delta time
      */
     const update = (delta) => {
-        const now = Date.now();
-
         // Update ship physics
         shipControls.update(uiManager.isReadingMode);
 

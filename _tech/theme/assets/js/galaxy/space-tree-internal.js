@@ -206,7 +206,7 @@ const makeContainerGetter = (rootBucket, nodeProps, minDepth = 0) => (parts) => 
  * @returns {Object} The fetched or newly created node
  */
 const getOrCreateNode = (bucket, name, nodeProps) => {
-    const { childKey, typeFlag } = nodeProps;
+    const { typeFlag } = nodeProps;
     if (!bucket[name]) {
         bucket[name] = createHierarchyNode(name, nodeProps);
         console.log('🌀 create node', name, typeFlag ? `(${typeFlag})` : '');
@@ -329,7 +329,6 @@ export const parseFileSystem = (files) => {
 
         // Nebula and galaxy share this builder; the nodeProps toggle the render path.
         const nodeProps = explicitNodeProps || fallbackProps;
-        const { childKey, leafKey, typeFlag } = nodeProps;
 
         items.forEach(file => {
             const parts = getParts(file);

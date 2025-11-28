@@ -21,7 +21,6 @@ export const createUIManager = (audioSystem) => {
     const hudDistance = document.getElementById('hud-distance');
     const warpBoostBtn = document.getElementById('warp-boost');
     // readingOverlay already declared above
-    const closeBtn = document.getElementById('reading-close');
 
     /**
      * Opens reading mode

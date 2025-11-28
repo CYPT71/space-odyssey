@@ -245,7 +245,7 @@ approach: ${targetMeta.approach || 'standard'}</pre>
             // Handle gas cloud teleportation (like planet): move near cloud center
             if (target.userData?.isGasCloud) {
                 if (!target.geometry?.boundingSphere) {
-                    try { target.geometry && target.geometry.computeBoundingSphere(); } catch (e) { }
+                    try { target.geometry && target.geometry.computeBoundingSphere(); } catch (_) { /* ignore */ }
                 }
                 const size = target.geometry?.boundingSphere?.radius || 80000;
                 const offset = new THREE.Vector3(0, 0, size + 20000);
@@ -306,7 +306,6 @@ approach: ${targetMeta.approach || 'standard'}</pre>
         });
 
     let targetCycleIndex = 0;
-    let targetCycleList = [];
 
     // Enter key handler
     document.addEventListener('keydown', (e) => {
@@ -416,7 +415,6 @@ approach: ${targetMeta.approach || 'standard'}</pre>
                     .sort((a, b) => a.dist - b.dist);
 
                 if (!candidates.length) return;
-                targetCycleList = candidates;
                 targetCycleIndex = (targetCycleIndex + 1) % candidates.length;
                 const pick = candidates[targetCycleIndex];
                 // Just select target, do not move ship

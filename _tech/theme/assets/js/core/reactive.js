@@ -77,13 +77,8 @@ export const createComputed = (computeFn, dependencies) => {
     // Watch dependencies
     dependencies.forEach(dep => {
         if (dep && typeof dep === 'object') {
-            // Assume it's a reactive proxy
-            const handler = {
-                set(target, prop, value) {
-                    isDirty = true;
-                    return Reflect.set(target, prop, value);
-                }
-            };
+            // Assume it's a reactive proxy; touching dependency marks dirty
+            isDirty = true;
         }
     });
 

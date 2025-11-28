@@ -1,5 +1,3 @@
-// Web Worker to parse file system into SpaceTree
-import { parseSpaceTree } from '../domain/space-tree.js';
 import { parseWithWasm } from '../native/fast-parser.js';
 
 self.onmessage = async (e) => {

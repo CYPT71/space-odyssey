@@ -19,6 +19,8 @@ jobs:
         with:
           node-version: '20'
       - run: npm install
+      - name: Patch Babel vendor import-meta-resolve
+        run: node scripts/patch-babel-vendor.js
       - run: npm test
     env:
       CI: true

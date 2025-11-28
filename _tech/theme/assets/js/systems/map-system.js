@@ -103,7 +103,6 @@ export function createMapSystem(systems) {
     });
 
     // Click to Target
-    let selectedTarget = null; // store currently targeted object for visual cue
     canvas.addEventListener('dblclick', (e) => {
         // Convert screen to world
         const cx = canvas.width / 2;
@@ -112,7 +111,6 @@ export function createMapSystem(systems) {
         const worldZ = (e.clientY - cy - offset.y) / scale;
 
         // Find closest object
-        const clickPos = new THREE.Vector3(worldX, 0, worldZ);
         const allObjects = galaxyManager.getAllObjects();
         let closest = null;
         let minD = Infinity;
@@ -151,16 +149,7 @@ export function createMapSystem(systems) {
         }
 
         if (closest) {
-            // Store the selected target for rendering a halo
-            selectedTarget = closest;
-
-            // Get name: priority is title > tiitle > name > tagName > 'Unknown'
             const userData = closest.userData || {};
-            const planetData = userData.planetData || {};
-            const name = planetData.title || planetData.tiitle || planetData.name ||
-                userData.nebulaName || userData.tagName || userData.cloudName || userData.categoryName || userData.cloudData?.name ||
-                'Unknown Object';
-
             // Check autopilot confirmation setting
             const requireConfirmation = localStorage.getItem('autopilotConfirmation') !== 'false';
 
@@ -294,55 +283,6 @@ export function createMapSystem(systems) {
         ctx.closePath();
         ctx.fill();
         ctx.restore();
-
-        // Helper to draw arrow to nearest nebula (red)
-        function drawNearestNebulaArrow() {
-            // Find nearest nebula object
-            let nearest = null;
-            let minDistSq = Infinity;
-            allObjects.forEach(obj => {
-                const ud = obj.userData;
-                if (!ud || !ud.isNebula) return;
-                const dx = obj.position.x - shipGroup.position.x;
-                const dy = obj.position.z - shipGroup.position.z;
-                const distSq = dx * dx + dy * dy;
-                if (distSq < minDistSq) {
-                    minDistSq = distSq;
-                    nearest = obj;
-                }
-            });
-            if (!nearest) return;
-            // Convert positions to screen coordinates
-            const shipPos = new THREE.Vector3();
-            shipGroup.getWorldPosition(shipPos);
-            const nebPos = new THREE.Vector3();
-            nearest.getWorldPosition(nebPos);
-            const sx = cx + offset.x + shipPos.x * scale;
-            const sy = cy + offset.y + shipPos.z * scale;
-            const px = cx + offset.x + nebPos.x * scale;
-            const py = cy + offset.y + nebPos.z * scale;
-            // Draw line (red)
-            ctx.save();
-            ctx.strokeStyle = 'rgba(255,0,0,0.8)';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(sx, sy);
-            ctx.lineTo(px, py);
-            ctx.stroke();
-            // Arrowhead
-            const angle = Math.atan2(py - sy, px - sx);
-            const headLen = 12;
-            ctx.beginPath();
-            ctx.moveTo(px, py);
-            ctx.lineTo(px - headLen * Math.cos(angle - Math.PI / 6), py - headLen * Math.sin(angle - Math.PI / 6));
-            ctx.lineTo(px - headLen * Math.cos(angle + Math.PI / 6), py - headLen * Math.sin(angle + Math.PI / 6));
-            ctx.lineTo(px, py);
-            ctx.fillStyle = 'rgba(255,0,0,0.8)';
-            ctx.fill();
-            ctx.restore();
-        }
-
-        // Replace drawTargetHalo call with arrow draws
 
         // HUD
         ctx.fillStyle = '#00F0FF';

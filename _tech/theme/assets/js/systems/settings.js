@@ -18,21 +18,6 @@ export const createSettingsPanel = () => {
     const resetBtn = panel?.querySelector('.settings-btn.reset');
 
     let currentRecording = null;
-    const defaultControls = {
-        forward: 'z',
-        backward: 's',
-        yawLeft: 'q',
-        yawRight: 'd',
-        pitchUp: 'w',
-        pitchDown: 'x',
-        rollLeft: 'r',
-        rollRight: 'f',
-        strafeLeft: 'a',
-        strafeRight: 'e',
-        moveUp: ' ',
-        moveDown: 'Shift',
-        stop: 'c'
-    };
 
     let controls = loadControlsShared();
 

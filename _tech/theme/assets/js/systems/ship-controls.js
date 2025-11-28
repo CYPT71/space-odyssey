@@ -6,7 +6,7 @@
  */
 
 import * as THREE from 'three';
-import { PHYSICS, GRAVITY } from '../config/constants.js';
+import { PHYSICS } from '../config/constants.js';
 import { applyShipAnimations } from './animations.js';
 import { loadControls as loadControlsShared } from '../config/controls.js';
 

@@ -4,8 +4,6 @@
  * @description Manages on-screen waypoints and off-screen directional indicators
  */
 
-import * as THREE from 'three';
-
 /**
  * Creates the navigation HUD system
  * @param {HTMLElement} container - DOM container for HUD elements
@@ -15,7 +13,6 @@ import * as THREE from 'three';
 export function createNavigationSystem(container, camera) {
     const trackedPlanets = []; // Array of planets to track
     let waypointElement = null; // Single waypoint element
-    let centralArrow = null; // Central direction arrow
     let nearestArrow = null; // Arrow pointing to nearest tracked object
 
     // Create HUD container if not exists
@@ -49,8 +46,6 @@ export function createNavigationSystem(container, camera) {
     centerArrow.style.borderBottom = '20px solid #FF0000'; // red arrow
     centerArrow.style.zIndex = '11';
     hudLayer.appendChild(centerArrow);
-    // Store reference
-    centralArrow = centerArrow;
 
     nearestArrow = document.createElement('div');
     nearestArrow.className = 'nav-nearest-arrow';

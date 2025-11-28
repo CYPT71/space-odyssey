@@ -5,6 +5,7 @@
  */
 
 import * as THREE from 'three';
+import { dist3 } from '../native/fast-math.js';
 
 const MAX_DEPTH = 8;
 const MAX_OBJECTS = 16; // Split if more than this
@@ -73,7 +74,7 @@ class OctreeNode {
         // Prune if bounds are too far
         // Distance from point to box
         const clamped = point.clone().clamp(this.bounds.min, this.bounds.max);
-        const distToBox = point.distanceTo(clamped);
+        const distToBox = dist3(point.x, point.y, point.z, clamped.x, clamped.y, clamped.z);
 
         if (distToBox > bestDist && distToBox > maxDist) return { bestObj, bestDist };
 
@@ -81,7 +82,7 @@ class OctreeNode {
         const scratchPos = new THREE.Vector3();
         for (const obj of this.objects) {
             obj.getWorldPosition(scratchPos);
-            const d = point.distanceTo(scratchPos);
+            const d = dist3(point.x, point.y, point.z, scratchPos.x, scratchPos.y, scratchPos.z);
             if (d < bestDist && d < maxDist) {
                 // Check type-specific range logic if needed, but for raw closest, this is fine.
                 // The manager handles type checks.
@@ -94,7 +95,7 @@ class OctreeNode {
             // Sort children by distance to point to visit likely candidates first
             const sortedChildren = this.children.map(child => {
                 const c = child.bounds.getCenter(new THREE.Vector3());
-                return { node: child, dist: point.distanceTo(c) };
+                return { node: child, dist: dist3(point.x, point.y, point.z, c.x, c.y, c.z) };
             }).sort((a, b) => a.dist - b.dist);
 
             for (const item of sortedChildren) {

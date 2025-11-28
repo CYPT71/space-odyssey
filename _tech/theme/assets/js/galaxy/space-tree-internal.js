@@ -43,11 +43,14 @@ const HIERARCHY_NODE_PROPS = Object.freeze({
     }
 });
 
-const BASE_URL = (typeof window !== 'undefined' && window.siteBase) ? (window.siteBase.replace(/\/+$/, '') || '') : '';
+const RUNTIME_BASE = (typeof window !== 'undefined' && window.siteBase)
+    ? (window.siteBase.replace(/\/+$/, '') || '')
+    : '';
+const BASE_URL = RUNTIME_BASE;
 const BASE_SLUG = BASE_URL.replace(/^\/+|\/+$/g, '');
 const stripBase = (val = '') => {
     if (!BASE_URL) return val;
-    return val.startsWith(BASE_URL) ? val.slice(BASE_URL.length) || '/' : val;
+    return val.startsWith(BASE_URL) ? (val.slice(BASE_URL.length) || '/') : val;
 };
 
 const normalizeInput = (path, url) => {

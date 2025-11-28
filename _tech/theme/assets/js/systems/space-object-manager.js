@@ -16,6 +16,7 @@ import { getObjectType, getDetectionRange } from '../core/space-object-utils.js'
 import { Octree } from '../core/octree.js';
 import { startMark, endMark, getDuration } from '../core/profiler.js';
 import { OBJECT_TYPES } from '../config/types.js';
+import { dist3 } from '../native/fast-math.js';
 
 /**
  * Creates unified space object manager
@@ -88,19 +89,41 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
      */
     const createRootPlanets = (files) => {
         if (!files) return [];
+
+        const placed = [];
+        const MIN_SEPARATION = 2_000_000; // 2 Mm to keep planets from touching
+
         return files.map((file, i) => {
-            const angle = (i / files.length) * Math.PI * 2;
-            const radius = 8000000 + Math.random() * 20000000; // 8-28M units (proportional to 8B galaxy spacing)
-            const height = (Math.random() - 0.5) * 4000000; // +/- 4M height
+            let angle = (i / files.length) * Math.PI * 2;
+            let radius = 8000000 + Math.random() * 20000000; // 8-28M units (proportional to 8B galaxy spacing)
+            let height = (Math.random() - 0.5) * 4000000; // +/- 4M height
+
+            // Rejection sampling to avoid overlap with already placed planets
+            const tryPlace = (attempts = 24) => {
+                let chosen = { x: 0, y: 0, z: 0 };
+                for (let n = 0; n < attempts; n++) {
+                    const ang = angle + (Math.random() - 0.5) * 0.4; // small jitter
+                    const rad = radius + (Math.random() - 0.5) * 1_000_000; // tighten distribution
+                    const h = height + (Math.random() - 0.5) * 200_000;
+                    const x = Math.cos(ang) * rad + (Math.random() - 0.5) * 300_000;
+                    const z = Math.sin(ang) * rad + (Math.random() - 0.5) * 300_000;
+                    const y = h;
+                    const tooClose = placed.some(p => dist3(p.x, p.y, p.z, x, y, z) < MIN_SEPARATION);
+                    if (!tooClose) {
+                        chosen = { x, y, z };
+                        return chosen;
+                    }
+                }
+                // Fallback: accept last sampled position even if close
+                return chosen;
+            };
+            const pos = tryPlace();
 
             const displayTitle = file.tiitle || file.title || file.name;
 
             const mesh = createPlanetLikeProcedural({ name: displayTitle, url: file.url });
-            mesh.position.set(
-                Math.cos(angle) * radius + (Math.random() - 0.5) * 1000000, // +/- 1M variation
-                height,
-                Math.sin(angle) * radius + (Math.random() - 0.5) * 1000000
-            );
+            mesh.position.set(pos.x, pos.y, pos.z);
+            placed.push({ x: pos.x, y: pos.y, z: pos.z });
 
             mesh.userData = {
                 ...mesh.userData,
@@ -219,8 +242,7 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
                 return;
             }
 
-            const base = (window.siteBase || '').replace(/\/+$/, '');
-            const workerUrl = `${base}/_tech/theme/assets/js/workers/parse-worker.js`;
+            const workerUrl = '/_tech/theme/assets/js/workers/parse-worker.js';
 
             if (window.Worker) {
                 const worker = new Worker(workerUrl, { type: 'module' });

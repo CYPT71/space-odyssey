@@ -133,6 +133,23 @@ export function createMapSystem(systems) {
             }
         });
 
+        // Fallback: if nothing was clicked, snap to nearest object around the ship within a short range
+        if (!closest) {
+            const shipPos = new THREE.Vector3();
+            shipGroup.getWorldPosition(shipPos);
+            const NEAR_FALLBACK_DIST = 10000; // 10 km
+            allObjects.forEach(obj => {
+                if (!obj.userData.planetData && !obj.userData.isNebula && !obj.userData.isGasCloud && !obj.userData.galaxyData && !obj.userData.isGalaxy) return;
+                const objPos = new THREE.Vector3();
+                obj.getWorldPosition(objPos);
+                const d = shipPos.distanceTo(objPos);
+                if (d < NEAR_FALLBACK_DIST && d < minD) {
+                    minD = d;
+                    closest = obj;
+                }
+            });
+        }
+
         if (closest) {
             // Store the selected target for rendering a halo
             selectedTarget = closest;

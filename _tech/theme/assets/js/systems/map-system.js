@@ -166,7 +166,8 @@ export function createMapSystem(systems) {
                         const terminal = document.getElementById('reading-overlay');
                         const terminalContent = document.getElementById('reading-content');
                         if (terminal && terminalContent) {
-                            terminalContent.innerHTML = content.innerHTML;
+                            // Avoid injecting raw HTML; render as plain text to prevent XSS
+                            terminalContent.textContent = content ? content.textContent || '' : '';
                             terminal.classList.remove('hidden');
                             if (window.uiManager && window.uiManager.openReadingMode) {
                                 window.uiManager.openReadingMode();

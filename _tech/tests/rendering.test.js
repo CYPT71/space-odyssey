@@ -13,6 +13,7 @@ describe('Rendering System', () => {
         mockParams = {
             scene: {},
             camera: {},
+            renderer: { render: jest.fn() },
             composer: {
                 render: jest.fn()
             },
@@ -20,7 +21,7 @@ describe('Rendering System', () => {
                 render: jest.fn()
             }
         };
-        renderingSystem = createRenderingSystem(mockParams);
+        renderingSystem = createRenderingSystem({ ...mockParams, usePostProcessing: true });
     });
 
     test('should create rendering system', () => {
@@ -31,6 +32,16 @@ describe('Rendering System', () => {
     test('should call composer.render', () => {
         renderingSystem.render();
         expect(mockParams.composer.render).toHaveBeenCalled();
+    });
+
+    test('should call renderer.render when post-processing disabled or XR', () => {
+        renderingSystem.setPostProcessing(false);
+        renderingSystem.render();
+        expect(mockParams.renderer.render).toHaveBeenCalled();
+        renderingSystem.setPostProcessing(true);
+        renderingSystem.setXRActive(true);
+        renderingSystem.render();
+        expect(mockParams.renderer.render).toHaveBeenCalledTimes(2);
     });
 
     test('should call labelRenderer.render with scene and camera', () => {

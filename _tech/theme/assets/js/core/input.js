@@ -172,6 +172,7 @@ approach: ${targetMeta.approach || 'standard'}</pre>
     const setupEventListeners = () => {
         // Optional mobile twin-sticks and reduced effects
         if (isMobile()) {
+            document.body.classList.add('mobile-mode');
             const disposeJoysticks = initMobileJoysticks(document.body, shipControls, { radius: 90 });
             teardownHandlers.push(disposeJoysticks);
             if (prefersReducedEffects() && uiManager?.reduceEffects) {
@@ -181,6 +182,7 @@ approach: ${targetMeta.approach || 'standard'}</pre>
 
         // Optional gamepad loop (safe no-op if none connected)
         const stopPad = startGamepadLoop(shipControls, {
+            autopilot: () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'l' })),
             stop: () => shipControls.disengageAutopilot && shipControls.disengageAutopilot(),
             cycleTarget: () => window.dispatchEvent(new KeyboardEvent('keydown', { key: loadControlsShared().targetCycle || 'n' }))
         });
@@ -513,10 +515,8 @@ approach: ${targetMeta.approach || 'standard'}</pre>
             if (isToggleButton) return;
             if (shipControls.isFineControlActive()) {
                 shipControls.setFineControl(false);
+                exitPointerLock();
             }
-
-            shipControls.setSpeed(0);
-            shipControls.disengageAutopilot && shipControls.disengageAutopilot();
         });
 
         // Fine control toggle only via button

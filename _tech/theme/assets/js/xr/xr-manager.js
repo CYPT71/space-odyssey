@@ -1,21 +1,23 @@
 /**
  * @fileoverview Progressive WebXR manager (optional).
+ * Delegates the render loop to caller for physics/HUD updates.
  */
 export const hasXR = () => typeof navigator !== 'undefined' && !!navigator.xr;
 
-export const createXRManager = (renderer, scene, camera) => {
+export const createXRManager = ({ renderer, onXRFrame }) => {
     let xrSession = null;
 
     const enterXR = async () => {
-        if (!hasXR() || xrSession) return;
+        if (!hasXR() || xrSession) return false;
         const supported = await navigator.xr.isSessionSupported('immersive-vr');
-        if (!supported) return;
+        if (!supported) return false;
         xrSession = await navigator.xr.requestSession('immersive-vr');
         renderer.xr.enabled = true;
         await renderer.xr.setSession(xrSession);
-        renderer.setAnimationLoop(() => {
-            renderer.render(scene, camera);
+        renderer.setAnimationLoop((timestamp, frame) => {
+            if (onXRFrame) onXRFrame(timestamp, frame);
         });
+        return true;
     };
 
     const exitXR = async () => {

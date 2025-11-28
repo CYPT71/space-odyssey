@@ -58,6 +58,7 @@ const NEBULA_CONFIG = Object.freeze({
 });
 
 export function createNebula(scene, center, tagName, postCount, parentColor = null) {
+    const computedRadius = NEBULA_CONFIG.baseRadius + postCount * NEBULA_CONFIG.radiusPerUnit;
     const nebula = createVolumetricCloud({
         center,
         name: tagName,
@@ -70,7 +71,9 @@ export function createNebula(scene, center, tagName, postCount, parentColor = nu
             spaceType: 'nebula',
             nebulaName: tagName,
             tagName: tagName,
-            postCount: postCount
+            postCount: postCount,
+            radius: computedRadius,
+            selectionRadius: computedRadius * 1.2
         }
     });
 

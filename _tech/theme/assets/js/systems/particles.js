@@ -1,6 +1,9 @@
 // Particles System Module
 // Manages starfield, colorful lights, and speed trails
 
+const STARFIELD_SPAN = 1e8; // 100,000,000 units
+const UNIVERSE_SIZE = 1e8; // cube size for wrapping
+
 import * as THREE from 'three';
 
 export class ParticleSystem {
@@ -26,9 +29,9 @@ export class ParticleSystem {
 
         for (let i = 0; i < starsCount; i++) {
             // Positions - Volume initial (scaled to match wrapping size)
-            posArray[i * 3] = (Math.random() - 0.5) * 100000000; // 100M units
-            posArray[i * 3 + 1] = (Math.random() - 0.5) * 100000000;
-            posArray[i * 3 + 2] = (Math.random() - 0.5) * 100000000;
+            posArray[i * 3] = (Math.random() - 0.5) * STARFIELD_SPAN; // 100M units
+            posArray[i * 3 + 1] = (Math.random() - 0.5) * STARFIELD_SPAN;
+            posArray[i * 3 + 2] = (Math.random() - 0.5) * STARFIELD_SPAN;
 
             // COULEURS VARIÉES (étoiles bleues, rouges, jaunes, blanches)
             const starType = Math.random();
@@ -178,10 +181,6 @@ export class ParticleSystem {
         const positions = this.starMesh.geometry.attributes.position.array;
         const shipPos = this.shipGroup.position;
 
-        // Size of the repeating universe cube
-        // MASSIVELY INCREASED to match new galaxy scale (30B units)
-        // This prevents empty zones between galaxies
-        const UNIVERSE_SIZE = 100000000; // 100M units (was 4M)
         const HALF_SIZE = UNIVERSE_SIZE / 2;
 
         for (let i = 0; i < this.starsCount; i++) {

@@ -25,7 +25,7 @@ export const createRadar = (systems) => {
 
         const cx = canvas.width / 2;
         const cy = canvas.height / 2;
-        const scale = 1 / 80000000; // adjust scale
+        const RADAR_SCALE = 1 / 80_000_000; // adjust scale
 
         ctx.strokeStyle = 'rgba(0,240,255,0.3)';
         ctx.beginPath();
@@ -38,8 +38,8 @@ export const createRadar = (systems) => {
             if (!ud.planetData && !ud.isGasCloud && !ud.isNebula && !ud.galaxyData) return;
             const pos = new THREE.Vector3();
             obj.getWorldPosition(pos);
-            const dx = (pos.x - shipGroup.position.x) * scale;
-            const dz = (pos.z - shipGroup.position.z) * scale;
+            const dx = (pos.x - shipGroup.position.x) * RADAR_SCALE;
+            const dz = (pos.z - shipGroup.position.z) * RADAR_SCALE;
             const x = cx + dx * (cx - 12);
             const y = cy + dz * (cy - 12);
             if (x < 0 || x > canvas.width || y < 0 || y > canvas.height) return;

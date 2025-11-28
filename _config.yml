@@ -7,9 +7,16 @@ description: "Deep Space Observatory Terminal - Portfolio & Projects"
 baseurl: "/space-odyssey"
 
 # Theme configuration (paths relative to repository root)
-layouts_dir: theme/_layouts
-includes_dir: theme/_includes
-sass_dir: theme/assets/css
+layouts_dir: _tech/theme/_layouts
+includes_dir: _tech/theme/_includes
+sass_dir: _tech/theme/assets/css
+theme: jekyll-theme-space-odyssey
+include:
+  - "_tech/theme"
+  - "_tech/theme/_layouts"
+  - "_tech/theme/_includes"
+  - "_tech/theme/assets"
+  - "_tech/native"
 
 # Markup
 markdown: kramdown

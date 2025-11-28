@@ -12,6 +12,7 @@ Analyse télémétrique des projets en orbite.
 **STATUT** : ACTIF
 **MASSE** : CRITIQUE
 **VALEUR AJOUTÉE** : Cold start < 100ms, isolation forte (Firecracker)
+**PATTERNS** : Commands/Ports, observabilité embarquée, tests contractuels.
 
 Outil CLI en **Go** pour le pilotage de micro-singularités (**Firecracker**).
 *   **Objectif** : Réduire le temps de démarrage des environnements de test à l'échelle de la milliseconde.
@@ -23,6 +24,7 @@ Outil CLI en **Go** pour le pilotage de micro-singularités (**Firecracker**).
 **STATUT** : STABLE
 **ORBITE** : GEOSTATIONNAIRE
 **VALEUR AJOUTÉE** : Autoscaling prédictif, réduction des coûts infra de ~20%
+**PATTERNS** : Event-driven, stratégie de backoff, supervision proactive.
 
 Bot d'orchestration autonome pour la gestion des ressources ludiques.
 *   **Objectif** : Autoscaling prédictif basé sur la densité de population (joueurs).
@@ -34,6 +36,7 @@ Bot d'orchestration autonome pour la gestion des ressources ludiques.
 **STATUT** : PRODUCTION
 **CHIFFREMENT** : QUANTUM-RESISTANT (TARGET)
 **VALEUR AJOUTÉE** : Suppression du mot de passe, UX plus simple, surface d'attaque réduite
+**PATTERNS** : Zero-trust, rotation de secrets, validation côté client/serveur.
 
 Module d'authentification **WebAuthn**.
 *   **Objectif** : Suppression des vecteurs d'attaque par mot de passe.

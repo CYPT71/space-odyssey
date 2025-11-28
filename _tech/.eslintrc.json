@@ -13,7 +13,8 @@
   "ignorePatterns": [
     "coverage/",
     "node_modules/",
-    "theme/assets/js/space-scene.js"
+    "theme/assets/js/space-scene.js",
+    "theme/assets/js/legacy/**"
   ],
   "rules": {
     "no-unused-vars": ["warn", { "args": "none", "ignoreRestSiblings": true }],

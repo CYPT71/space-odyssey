@@ -8,6 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
 echo "==> Installing Ruby gems..."
+bundle config set path "vendor/bundle" >/dev/null
 bundle install
 
 if [ -f package.json ]; then

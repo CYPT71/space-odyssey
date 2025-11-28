@@ -30,7 +30,8 @@ const ROTATION_CONFIG = {
     MAX_BANK_ANGLE: Math.PI / 2.4, // ~75 degrees
     BANK_SPEED: 0.1,
     YAW_BANK_FACTOR: 15,
-    STRAFE_BANK_FACTOR: 0.5
+    STRAFE_BANK_FACTOR: 0.5,
+    INPUT_SCALE: 1e-5
 };
 
 const MOVEMENT_CONFIG = {
@@ -496,8 +497,8 @@ export const createShipControls = (shipGroup) => {
                 // Mouse steering for fine control
                 const mx = state.mouseDelta.x;
                 const my = state.mouseDelta.y;
-                state.rotVel.y += (-mx * 0.00001);
-                state.rotVel.x += (-my * 0.00001);
+                state.rotVel.y += (-mx * ROTATION_CONFIG.INPUT_SCALE);
+                state.rotVel.x += (-my * ROTATION_CONFIG.INPUT_SCALE);
                 state.mouseDelta.x = 0;
                 state.mouseDelta.y = 0;
                 // Clamp speed to fine impulse

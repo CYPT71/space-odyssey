@@ -55,7 +55,7 @@ export function createPlanetLikeProcedural({ name, url, size, color } = {}) {
     mesh.add(label);
 
     // Rotation speed: smaller rotate faster
-    const rotationSpeed = (1 / planetSize) * 0.0001;
+    const rotationSpeed = (1 / planetSize) * 1e-4;
 
     mesh.userData = mesh.userData || {};
     mesh.userData.rotationSpeed = rotationSpeed;
@@ -67,4 +67,3 @@ export function createPlanetLikeProcedural({ name, url, size, color } = {}) {
 
     return mesh;
 }
-

@@ -29,12 +29,17 @@ export function initScene() {
 
     // Lighting - SPACE ENGINEERS STYLE
     // Lumière ambiante plus forte pour voir les planètes et le vaisseau
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); // Augmenté de 0.6 à 1.0
+    const LIGHT_COLOR = 0xFFFFFF;
+    const AMBIENT_INTENSITY = 1.0;
+    const DIR_INTENSITY = 1.2;
+    const DIR_POS = { x: 5_000_000, y: 10_000_000, z: 7_500_000 };
+
+    const ambientLight = new THREE.AmbientLight(LIGHT_COLOR, AMBIENT_INTENSITY); // Augmenté de 0.6 à 1.0
     scene.add(ambientLight);
 
     // Lumière directionnelle principale (soleil)
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2); // Augmenté de 0.8 à 1.2
-    directionalLight.position.set(5000000, 10000000, 7500000); // x1000 pour suivre l'échelle
+    const directionalLight = new THREE.DirectionalLight(LIGHT_COLOR, DIR_INTENSITY); // Augmenté de 0.8 à 1.2
+    directionalLight.position.set(DIR_POS.x, DIR_POS.y, DIR_POS.z); // x1000 pour suivre l'échelle
     scene.add(directionalLight);
 
     // Lumière de remplissage pour éviter les zones trop sombres

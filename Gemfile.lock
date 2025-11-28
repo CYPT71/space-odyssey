@@ -1,3 +1,10 @@
+PATH
+  remote: _tech/theme
+  specs:
+    jekyll-theme-space-odyssey (0.1.0)
+      jekyll (>= 4.3, < 5.0)
+      jekyll-sass-converter (>= 3.0)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -150,6 +157,7 @@ PLATFORMS
 
 DEPENDENCIES
   jekyll (~> 4.3.2)
+  jekyll-theme-space-odyssey!
   webrick
 
 BUNDLED WITH

@@ -35,5 +35,9 @@ npm-debug.log*
 tmp/
 temp/
 
+/theme
+
 
 TODO.md
+
+nodes_modules/

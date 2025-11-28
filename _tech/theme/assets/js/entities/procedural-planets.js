@@ -26,7 +26,9 @@ export function createProceduralPlanets(count = 100) {
 
         // Random position in FULL 3D SPACE (not just a plane)
         // Extended galaxy distances: 10M to 100M units
-        const radius = 10000000 + Math.random() * 90000000;
+    const BASE_RADIUS = 10_000_000;
+    const RADIUS_SPREAD = 90_000_000;
+    const radius = BASE_RADIUS + Math.random() * RADIUS_SPREAD;
         const theta = Math.random() * Math.PI * 2; // Full horizontal rotation
         const phi = Math.acos(2 * Math.random() - 1); // Full vertical distribution (spherical)
 
@@ -80,7 +82,7 @@ export function createProceduralPlanets(count = 100) {
         mesh.add(label);
 
         // Add rotation speed (smaller planets rotate faster)
-        const rotationSpeed = (1 / size) * 0.0001;
+    const rotationSpeed = (1 / size) * 1e-4;
 
         // Store planet data
         mesh.userData = {

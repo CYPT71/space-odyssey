@@ -19,6 +19,8 @@ Relevé séquentiel des interventions sur le secteur.
 *   **Déploiement de Flotte** : Stabilisation de l'orbite des clusters Kubernetes. Implémentation de maillages de services (Service Mesh) pour unifier les communications inter-stellaires.
 *   **Automatisation** : Les sentinelles (CI/CD) déploient désormais le code sans intervention humaine, réduisant le risque d'erreur biologique.
 *   **Sécurisation** : Activation des boucliers périmétriques. Tout signal non identifié est rejeté dans le néant.
+*   **Design/Arch** : Patterns hexagonaux pour services internes, contrats d'API testés, budgets SLO et playbooks runbooks.
+*   **Guidance** : Conduite de revues d'archi, cadrage des patterns (cache, file, idempotence), transmission aux devs juniors.
 
 ## [LOG-202X] :: SECTEUR [PREVIOUS]
 **STATUT** : TERMINE
@@ -27,6 +29,7 @@ Relevé séquentiel des interventions sur le secteur.
 *   **Maintenance Réacteur** : Gestion de la température des cœurs Windows/Linux. Prévention des fusions critiques.
 *   **Gestion des Accréditations** : Configuration des protocoles d'accès pour les équipages (Intune / Azure AD).
 *   **Réponse Incident** : Intervention sur une brèche de coque (Security Breach). Rétablissement de l'intégrité structurelle.
+*   **Scalabilité** : Montée en charge progressive avec limites contrôlées, partitionnement des services critiques.
 
 ## [LOG-ARCHIVE] :: RECHERCHE PERSONNELLE
 

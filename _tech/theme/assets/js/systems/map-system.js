@@ -35,7 +35,8 @@ export function createMapSystem(systems) {
 
     const ctx = canvas.getContext('2d');
     let isOpen = false;
-    let scale = 0.00005; // Zoom level
+    const INITIAL_SCALE = 5e-5; // Zoom level
+    let scale = INITIAL_SCALE;
     let offset = { x: 0, y: 0 }; // Pan offset
     let isDragging = false;
     let lastMouse = { x: 0, y: 0 };

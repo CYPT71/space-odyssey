@@ -494,7 +494,7 @@ approach: ${targetMeta.approach || 'standard'}</pre>
             if (shipControls.isFineControlActive()) {
                 shipControls.setFineControl(false);
             }
-            // Cancel all movement on generic click (safety stop)
+
             shipControls.setSpeed(0);
             shipControls.disengageAutopilot && shipControls.disengageAutopilot();
         });
@@ -517,7 +517,7 @@ approach: ${targetMeta.approach || 'standard'}</pre>
                     terminal.classList.add('hidden');
                     uiManager.closeReadingMode();
                     // Full fallback: navigate back to root dashboard to avoid stuck state
-                    window.location.href = '/';
+                    window.location.href = window.siteBase || '/';
                 }
             });
         }

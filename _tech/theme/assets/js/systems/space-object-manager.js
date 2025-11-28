@@ -128,7 +128,8 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
             mesh.userData = {
                 ...mesh.userData,
                 planetData: { ...file, title: displayTitle },
-                objectType: OBJECT_TYPES.PLANET
+                objectType: OBJECT_TYPES.PLANET,
+                distFn: (vec) => dist3(mesh.position.x, mesh.position.y, mesh.position.z, vec.x, vec.y, vec.z)
             };
 
             return mesh;
@@ -247,6 +248,11 @@ export const createSpaceObjectManager = (scene, audioSystem) => {
             if (window.Worker) {
                 const worker = new Worker(workerUrl, { type: 'module' });
                 worker.onmessage = (e) => {
+                    if (e.data && e.data.error) {
+                        console.warn('Parse worker returned error, falling back:', e.data.error);
+                        parseAndPopulate();
+                        return;
+                    }
                     console.log('🧵 Worker parsed tree');
                     saveCachedTree(hash, e.data);
                     populateFromTree(e.data);

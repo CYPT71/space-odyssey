@@ -57,6 +57,7 @@ const createShipState = () => ({
     keys: {},
     lastWarpChange: 0,
     rotVel: { x: 0, y: 0, z: 0 },
+    rollAngle: 0,
     targetBankAngle: 0,
     currentBankAngle: 0,
     fineControl: false,
@@ -197,7 +198,9 @@ const calculateBankingAngle = (state, controls) => {
     const applyRotation = (shipGroup, state) => {
         shipGroup.rotation.x += state.rotVel.x;
         shipGroup.rotation.y += state.rotVel.y;
-        shipGroup.rotation.z = state.currentBankAngle + (state.rotVel.z * 10);
+        // Accumulate roll so full 360 spins are possible without reset
+        state.rollAngle += state.rotVel.z;
+        shipGroup.rotation.z = state.currentBankAngle + state.rollAngle;
     };
 
 // ============================================================

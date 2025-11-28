@@ -67,7 +67,9 @@ export function createGalaxyTrails(scene, planets, galaxyColor) {
             .map((other, otherIndex) => ({
                 planet: other,
                 index: otherIndex,
-                distance: planet.position.distanceTo(other.position)
+                distance: planet.userData?.distFn
+                    ? planet.userData.distFn(other.position)
+                    : planet.position.distanceTo(other.position)
             }))
             .filter(d => d.index !== index)
             .sort((a, b) => a.distance - b.distance)

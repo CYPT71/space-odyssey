@@ -13,6 +13,7 @@ import * as THREE from 'three';
 import { getObjectName, getObjectType, getDetectionRange } from './space-object-utils.js';
 import { emitGameplayEvent } from '../systems/gameplay-hooks.js';
 import { updateAmbientForScene } from '../effects/audio-effects.js';
+import { startMark, endMark } from './profiler.js';
 
 export function createPhysicsSystem(systems) {
     const {
@@ -62,8 +63,12 @@ export function createPhysicsSystem(systems) {
      * @param {number} delta - Delta time
      */
     const update = (delta) => {
+        startMark('physics-frame');
+
         // Update ship physics
+        startMark('physics-ship');
         shipControls.update(uiManager.isReadingMode);
+        endMark('physics-ship');
 
         // Get current speed and warp factor
         const currentSpeed = shipControls.getSpeed();
@@ -81,13 +86,19 @@ export function createPhysicsSystem(systems) {
         cameraController.update(currentSpeed < 0, speedRatio);
 
         // Update particles with current speed and Warp 20 state for deformation effects
+        startMark('physics-particles');
         particleSystem.update(currentSpeed, isWarp20);
+        endMark('physics-particles');
 
         // Update Navigation HUD
+        startMark('physics-hud');
         navigationHUD.update(shipGroup.position);
+        endMark('physics-hud');
 
         // Update Scanner
+        startMark('physics-scanner');
         scannerSystem.update(delta);
+        endMark('physics-scanner');
 
         // Update Ambient Audio
         audioSystem.updateAmbient(speedRatio);
@@ -101,7 +112,9 @@ export function createPhysicsSystem(systems) {
         audioSystem.updateWarpSound(warpFactor);
 
         // Update galaxies
+        startMark('physics-galaxies');
         galaxyManager.update();
+        endMark('physics-galaxies');
 
         // Rotate planets
         allPlanets.forEach(obj => {
@@ -160,8 +173,12 @@ export function createPhysicsSystem(systems) {
             uiManager.hudTarget.textContent = 'TARGET: NONE';
         }
 
+        startMark('physics-hud-update');
         uiManager.updateHUD(warpFactor, closestObject, currentSpeed);
+        endMark('physics-hud-update');
         // Optional: could emit a short-lived ping here; halo already indicates selection.
+
+        endMark('physics-frame');
     };
 
     return { update };

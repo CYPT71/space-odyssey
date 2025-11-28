@@ -56,6 +56,7 @@ const createShipState = () => ({
     speed: 0,
     keys: {},
     lastWarpChange: 0,
+    axes: { forward: 0, strafe: 0, yaw: 0, pitch: 0 },
     rotVel: { x: 0, y: 0, z: 0 },
     rollAngle: 0,
     targetBankAngle: 0,
@@ -155,6 +156,10 @@ const applyRotationalInertia = (state, controls) => {
     state.rotVel.x *= DECAY;
     state.rotVel.y *= DECAY;
     state.rotVel.z *= DECAY;
+
+    // Analog (touch/gamepad) contributions
+    if (state.axes.yaw) state.rotVel.y += (-state.axes.yaw) * ACCELERATION * 1.5;
+    if (state.axes.pitch) state.rotVel.x += (-state.axes.pitch) * ACCELERATION * 1.5;
 };
 
 /**
@@ -227,6 +232,8 @@ const applyStrafeMovement = (shipGroup, state, controls) => {
 
     if (isKeyPressed(state, controls.strafeLeft)) shipGroup.translateX(-speed);
     if (isKeyPressed(state, controls.strafeRight)) shipGroup.translateX(speed);
+    // Analog strafe
+    if (state.axes.strafe) shipGroup.translateX(state.axes.strafe * speed);
 };
 
 /**
@@ -492,6 +499,11 @@ export const createShipControls = (shipGroup) => {
             applyRotation(shipGroup, state);
         } else {
             // Manual Control
+            // Analog forward/back sets impulse speed directly (non-warp)
+            if (state.axes.forward) {
+                state.warpLevel = 0;
+                state.speed = state.axes.forward * WARP_SPEEDS[0];
+            }
             applyForwardMovement(shipGroup, state);
             applyRotationalInertia(state, controls);
             updateBanking(state, controls);
@@ -543,6 +555,27 @@ export const createShipControls = (shipGroup) => {
         getWarpFactor: () => state.warpLevel,
         isFineControlActive: () => state.fineControl,
         setFineControl: (on) => { state.fineControl = !!on; },
+        // Analog setters (mobile/gamepad)
+        setForward: (v) => {
+            state.axes.forward = Math.max(-1, Math.min(1, v));
+            if (state.axes.forward !== 0) {
+                state.autopilot.active = false;
+                state.autopilot.warp20Active = false;
+            }
+        },
+        setStrafe: (v) => {
+            state.axes.strafe = Math.max(-1, Math.min(1, v));
+            if (state.axes.strafe !== 0) {
+                state.autopilot.active = false;
+                state.autopilot.warp20Active = false;
+            }
+        },
+        setYaw: (v) => {
+            state.axes.yaw = Math.max(-1, Math.min(1, v));
+        },
+        setPitch: (v) => {
+            state.axes.pitch = Math.max(-1, Math.min(1, v));
+        },
         applyMouseDelta: (dx, dy) => {
             state.mouseDelta.x += dx;
             state.mouseDelta.y += dy;

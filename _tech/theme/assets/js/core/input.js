@@ -7,6 +7,9 @@
 import * as THREE from 'three';
 import { loadControls as loadControlsShared } from '../config/controls.js';
 import { getObjectType, getDetectionRange } from './space-object-utils.js';
+import { isMobile, prefersReducedEffects } from '../utils/device.js';
+import { initMobileJoysticks } from '../input/mobile-joysticks.js';
+import { startGamepadLoop } from '../input/gamepad.js';
 
 /**
  * Creates the input handling system
@@ -22,6 +25,7 @@ export function createInputSystem(systems) {
         galaxyManager,
         scannerSystem
     } = systems;
+    const teardownHandlers = [];
 
     // Shared history buffer for the reading overlay (guaranteed defined)
     if (!window.readingHistory) window.readingHistory = [];
@@ -166,6 +170,22 @@ approach: ${targetMeta.approach || 'standard'}</pre>
      * Setup all event listeners
      */
     const setupEventListeners = () => {
+        // Optional mobile twin-sticks and reduced effects
+        if (isMobile()) {
+            const disposeJoysticks = initMobileJoysticks(document.body, shipControls, { radius: 90 });
+            teardownHandlers.push(disposeJoysticks);
+            if (prefersReducedEffects() && uiManager?.reduceEffects) {
+                uiManager.reduceEffects();
+            }
+        }
+
+        // Optional gamepad loop (safe no-op if none connected)
+        const stopPad = startGamepadLoop(shipControls, {
+            stop: () => shipControls.disengageAutopilot && shipControls.disengageAutopilot(),
+            cycleTarget: () => window.dispatchEvent(new KeyboardEvent('keydown', { key: loadControlsShared().targetCycle || 'n' }))
+        });
+        teardownHandlers.push(stopPad);
+
         // Pointer lock helpers for fine control
         const requestPointerLock = () => {
             if (document.pointerLockElement !== document.body && document.body.requestPointerLock) {
@@ -541,6 +561,7 @@ approach: ${targetMeta.approach || 'standard'}</pre>
     return {
         setupEventListeners,
         triggerTeleportEffect,
-        interceptLinksInContent
+        interceptLinksInContent,
+        teardown: () => teardownHandlers.forEach(fn => fn && fn())
     };
 }

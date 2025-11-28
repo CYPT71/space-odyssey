@@ -853,3 +853,29 @@ footer {
 #breadcrumb a:hover {
   text-decoration: underline;
 }
+
+/* Touch control zones (mobile only) */
+.touch-zone {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: 50vw;
+  z-index: 30;
+  touch-action: none;
+}
+.touch-zone-left { left: 0; }
+.touch-zone-right { right: 0; }
+@media (hover: none) and (pointer: coarse) {
+  .touch-zone::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 140px;
+    height: 140px;
+    transform: translate(-50%, -50%);
+    border: 1px solid rgba(0, 255, 255, 0.15);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+}

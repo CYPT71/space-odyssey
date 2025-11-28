@@ -25,13 +25,15 @@ const WARP_SPEEDS = {
 };
 
 const ROTATION_CONFIG = {
-    ACCELERATION: 0.002,
+    ACCELERATION: 0.003,
     DECAY: 0.92,
     MAX_BANK_ANGLE: Math.PI / 2.4, // ~75 degrees
     BANK_SPEED: 0.1,
     YAW_BANK_FACTOR: 15,
     STRAFE_BANK_FACTOR: 0.5,
-    INPUT_SCALE: 1e-5
+    INPUT_SCALE: 1e-5,
+    ROLL_FROM_STRAFE: 1.2, // amplify roll when using A/E
+    ROLL_GAIN: 2.0       // faster roll with R/F
 };
 
 const MOVEMENT_CONFIG = {
@@ -141,12 +143,12 @@ const applyRotationalInertia = (state, controls) => {
     if (isKeyPressed(state, controls.pitchUp)) state.rotVel.x += ACCELERATION;
     if (isKeyPressed(state, controls.pitchDown)) state.rotVel.x -= ACCELERATION;
 
-    // Roll (Manual barrel rolls)
-    if (isKeyPressed(state, controls.rollLeft)) state.rotVel.z += ACCELERATION;
-    if (isKeyPressed(state, controls.rollRight)) state.rotVel.z -= ACCELERATION;
+    // Roll (Manual barrel rolls) with higher gain
+    if (isKeyPressed(state, controls.rollLeft)) state.rotVel.z += ACCELERATION * ROTATION_CONFIG.ROLL_GAIN;
+    if (isKeyPressed(state, controls.rollRight)) state.rotVel.z -= ACCELERATION * ROTATION_CONFIG.ROLL_GAIN;
     // Secondary roll via strafe keys for full rotations with A/E
-    if (isKeyPressed(state, controls.strafeLeft)) state.rotVel.z += ACCELERATION * 0.6;
-    if (isKeyPressed(state, controls.strafeRight)) state.rotVel.z -= ACCELERATION * 0.6;
+    if (isKeyPressed(state, controls.strafeLeft)) state.rotVel.z += ACCELERATION * ROTATION_CONFIG.ROLL_FROM_STRAFE;
+    if (isKeyPressed(state, controls.strafeRight)) state.rotVel.z -= ACCELERATION * ROTATION_CONFIG.ROLL_FROM_STRAFE;
 
     // Apply decay
     state.rotVel.x *= DECAY;
@@ -444,9 +446,10 @@ export const createShipControls = (shipGroup) => {
         state.keys[e.key] = true;
         if (e.key === ' ') e.preventDefault();
 
-        // Manual input disengages autopilot
-        if (state.autopilot.active && ['w', 'a', 's', 'd', 'q', 'e', 'z', 'x', 'c', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+        // Manual input disengages autopilot (any key)
+        if (state.autopilot.active) {
             state.autopilot.active = false;
+            state.autopilot.warp20Active = false;
             console.log('Autopilot: Disengaged by manual input');
         }
 

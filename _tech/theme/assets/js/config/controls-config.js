@@ -15,5 +15,6 @@ export const DEFAULT_CONTROLS = Object.freeze({
     moveUp: ' ',
     moveDown: 'Shift',
     stop: 'c',
+    fineToggle: 'p',
     targetCycle: 'n'
 });

@@ -471,6 +471,14 @@ approach: ${targetMeta.approach || 'standard'}</pre>
             });
         }
 
+        // Fine control via keyboard toggle
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            if (key === controls.fineToggle) {
+                toggleFineControl();
+            }
+        });
+
         // Mouse steering for fine control
         window.addEventListener('mousemove', (e) => {
             if (!shipControls.isFineControlActive()) return;
@@ -486,6 +494,9 @@ approach: ${targetMeta.approach || 'standard'}</pre>
             if (shipControls.isFineControlActive()) {
                 shipControls.setFineControl(false);
             }
+            // Cancel all movement on generic click (safety stop)
+            shipControls.setSpeed(0);
+            shipControls.disengageAutopilot && shipControls.disengageAutopilot();
         });
 
         // Fine control toggle only via button
@@ -505,6 +516,8 @@ approach: ${targetMeta.approach || 'standard'}</pre>
                 } else {
                     terminal.classList.add('hidden');
                     uiManager.closeReadingMode();
+                    // Full fallback: navigate back to root dashboard to avoid stuck state
+                    window.location.href = '/';
                 }
             });
         }
@@ -517,6 +530,9 @@ approach: ${targetMeta.approach || 'standard'}</pre>
                 if (terminal) {
                     terminal.classList.add('hidden');
                     uiManager.closeReadingMode();
+                }
+                if (shipControls.isFineControlActive()) {
+                    shipControls.setFineControl(false);
                 }
             }
         });

@@ -3,7 +3,7 @@
  * @author CYPT71
  */
 
-import { MathUtils } from '../../theme/assets/js/utils/math.js';
+import { MathUtils } from '../theme/assets/js/utils/math.js';
 
 describe('Math Utilities', () => {
     describe('clamp', () => {

@@ -3,7 +3,7 @@
  * @author CYPT71
  */
 
-import { createRenderingSystem } from '../../theme/assets/js/core/rendering.js';
+import { createRenderingSystem } from '../theme/assets/js/core/rendering.js';
 
 describe('Rendering System', () => {
     let mockParams;

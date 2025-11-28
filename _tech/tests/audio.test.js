@@ -3,7 +3,7 @@
  * @author CYPT71
  */
 
-import { createAudioSystem } from '../../theme/assets/js/systems/audio.js';
+import { createAudioSystem } from '../theme/assets/js/systems/audio.js';
 
 // Mock Web Audio API
 global.AudioContext = jest.fn().mockImplementation(() => ({

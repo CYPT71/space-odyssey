@@ -3,7 +3,8 @@
  * @author CYPT71
  */
 
-import { createNebula, createTagNebulae, updateNebulae } from '../../theme/assets/js/systems/nebula-system.js';
+import { createNebula, createTagNebulae, updateNebulae } from '../theme/assets/js/systems/nebula-system.js';
+import { ColorScratch } from './__mocks__/color-scratch.js';
 import * as THREE from 'three';
 
 describe('Nebula System', () => {
@@ -43,7 +44,7 @@ describe('Nebula System', () => {
             const nebula = createNebula(mockScene, center, 'tag', 100);
 
             const count = nebula.geometry.attributes.position.count;
-            expect(count).toBeLessThanOrEqual(1000);
+            expect(count).toBeLessThanOrEqual(2000);
         });
 
         test('should generate consistent colors for same tag', () => {

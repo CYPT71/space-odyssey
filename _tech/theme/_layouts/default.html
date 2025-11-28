@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page.title | default: site.title }} // TERMINAL</title>
+  <meta name="description" content="{{ page.description | default: site.description }}">
+  <link rel="icon" href="{{ '/_tech/theme/assets/img/favicon.svg' | relative_url }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ "/_tech/theme/assets/css/style.css" | relative_url }}">
+  <link rel="stylesheet" href="{{ "/_tech/theme/assets/css/settings.css" | relative_url }}">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+
+  <div class="scanlines"></div>
+
+  <!-- Navigation Bar -->
+  <nav id="navbar">
+    <div class="nav-brand">DEEP SPACE OBSERVATORY</div>
+    <div class="nav-links" id="nav-links">
+      <!-- Navigation will be generated dynamically -->
+    </div>
+  </nav>
+
+  <!-- Main Content (Terminal) -->
+  <!-- Main Content (Terminal) -->
+  <!-- Content is now inside #reading-overlay below -->
+
+  <!-- Settings Button (Gear) -->
+  <button id="settings-button" title="Controls Settings">⚙️</button>
+
+  <!-- Settings Panel -->
+  <div id="settings-panel">
+    <div class="settings-header">
+      <h2>⚙️ CONTROLS CONFIGURATION</h2>
+      <button class="close-settings">✕</button>
+    </div>
+
+    <div class="control-group">
+      <label>FORWARD</label>
+      <div class="control-input">
+        <button class="key-button" data-action="forward">Z</button>
+        <span style="color: #888;">Move forward</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>BACKWARD</label>
+      <div class="control-input">
+        <button class="key-button" data-action="backward">S</button>
+        <span style="color: #888;">Move backward</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>YAW LEFT</label>
+      <div class="control-input">
+        <button class="key-button" data-action="yawLeft">Q</button>
+        <span style="color: #888;">Turn left (flat)</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>YAW RIGHT</label>
+      <div class="control-input">
+        <button class="key-button" data-action="yawRight">D</button>
+        <span style="color: #888;">Turn right (flat)</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>PITCH UP</label>
+      <div class="control-input">
+        <button class="key-button" data-action="pitchUp">W</button>
+        <span style="color: #888;">Nose up</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>PITCH DOWN</label>
+      <div class="control-input">
+        <button class="key-button" data-action="pitchDown">X</button>
+        <span style="color: #888;">Nose down</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>ROLL LEFT</label>
+      <div class="control-input">
+        <button class="key-button" data-action="rollLeft">R</button>
+        <span style="color: #888;">Roll left</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>ROLL RIGHT</label>
+      <div class="control-input">
+        <button class="key-button" data-action="rollRight">F</button>
+        <span style="color: #888;">Roll right</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>STRAFE LEFT</label>
+      <div class="control-input">
+        <button class="key-button" data-action="strafeLeft">A</button>
+        <span style="color: #888;">Move left</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>STRAFE RIGHT</label>
+      <div class="control-input">
+        <button class="key-button" data-action="strafeRight">E</button>
+        <span style="color: #888;">Move right</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>CYCLE TARGET</label>
+      <div class="control-input">
+        <button class="key-button" data-action="targetCycle" id="bind-target-cycle">N</button>
+        <span style="color: #888;">Cycle overlapping targets</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>MOVE UP</label>
+      <div class="control-input">
+        <button class="key-button" data-action="moveUp">SPACE</button>
+        <span style="color: #888;">Move up</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>MOVE DOWN</label>
+      <div class="control-input">
+        <button class="key-button" data-action="moveDown">SHIFT</button>
+        <span style="color: #888;">Move down</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>EMERGENCY STOP</label>
+      <div class="control-input">
+        <button class="key-button" data-action="stop">C</button>
+        <span style="color: #888;">Full stop</span>
+      </div>
+    </div>
+
+    <div class="settings-divider" style="margin: 20px 0; border-top: 1px solid rgba(0,240,255,0.3);"></div>
+    
+    <div class="control-group">
+      <label>AUTOPILOT SETTINGS</label>
+      <div class="control-input">
+        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+          <input type="checkbox" id="autopilot-confirmation" checked style="width: 20px; height: 20px; cursor: pointer;">
+          <span style="color: #888;">Require confirmation before engaging autopilot</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="settings-buttons">
+      <button class="settings-btn reset">RESET TO DEFAULT</button>
+      <button class="settings-btn">SAVE & CLOSE</button>
+    </div>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud-overlay">
+    <div class="hud-line" id="breadcrumb">UNIVERSE</div>
+    <div class="hud-line" id="hud-target">TARGET: NONE</div>
+    <div class="hud-line" id="hud-distance">DIST: -</div>
+    <div class="hud-line" id="controls-hint">Z/S:FWD/BACK | Q/D:YAW | A/E:STRAFE<br>W/X:PITCH | R/F:ROLL |
+      SPACE/SHIFT:UP/DOWN | C:STOP</div>
+    <div class="hud-buttons">
+      <button id="warp-boost" class="warp-boost-btn">⚡ ENGAGE WARP 5</button>
+      <button id="return-base" class="warp-boost-btn" style="border-color: #FF3300; color: #FF3300;">🏠 RETURN TO
+        BASE</button>
+      <button id="fine-control" class="warp-boost-btn" style="border-color: #888; color: #00F0FF;">Fine Pilot</button>
+    </div>
+  </div>
+
+  <!-- HUD Minimap -->
+  <div id="hud-minimap">
+    <h3>📡 KNOWN OBJECTS</h3>
+    <div id="minimap-list"></div>
+  </div>
+
+  <!-- Radar Overlay -->
+  <div id="radar-overlay" class="hidden terminal-panel">
+    <canvas id="radar-canvas" width="220" height="220"></canvas>
+    <button id="radar-toggle">☰</button>
+  </div>
+
+  <!-- Compass HUD -->
+  <div id="compass-bar">
+    <div id="compass-center"></div>
+    <div id="compass-container"></div>
+  </div>
+
+  <!-- WebGL Container -->
+  <div id="webgl-container"></div>
+
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="hidden">
+    <div class="loading-box">
+      <div class="spinner"></div>
+      <h3>INITIALIZING UNIVERSE</h3>
+      <p>Preparing galaxies, clouds and navigation…</p>
+    </div>
+  </div>
+
+  <!-- Tutorial Overlay -->
+  <div id="tutorial-overlay" class="hidden">
+    <div class="tutorial-backdrop"></div>
+    <div class="tutorial-highlight"></div>
+    <div class="tutorial-box">
+      <div class="terminal-chrome">
+        <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+        <span class="terminal-label">FLIGHT SCHOOL // PILOT CONSOLE</span>
+      </div>
+      <div class="tutorial-body">
+        <h3 id="tutorial-title">Welcome</h3>
+        <p id="tutorial-text">Use the controls to navigate.</p>
+        <pre id="tutorial-terminal" class="terminal-log">ship&gt; awaiting input...</pre>
+      </div>
+      <div class="tutorial-actions">
+        <button id="tutorial-prev">◀ Prev</button>
+        <button id="tutorial-next">Next ▶</button>
+        <button id="tutorial-close">✕ Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reading Overlay (Terminal) -->
+  <!-- Reading Overlay (Terminal) -->
+  <div id="reading-overlay">
+    <div class="reading-header">
+      <h3 class="reading-title">INCOMING TRANSMISSION</h3>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button id="reading-back">◀ BACK</button>
+        <button id="reading-close">✕ CLOSE</button>
+      </div>
+    </div>
+    <div id="reading-content">
+      {{ content }}
+    </div>
+  </div>
+
+  <footer>
+    <p>TERMINAL ID: OBS-01 // ORBITAL STATION // {{ site.time | date: '%Y' }}</p>
+  </footer>
+
+  <script>
+    // Expose base URL prefix (relative_url aware) so modules can strip/restore when normalizing paths
+    window.siteBase = ("{{ '/' | relative_url }}").replace(/\/+$/, '');
+
+    // Inject complete file system for galaxy generation
+    // Inject complete file system for galaxy generation
+    window.fileSystem = [
+      {% for page in site.pages %}
+    {
+      title: "{{ page.title | default: page.name | escape }}",
+      tiitle: "{{ page.tiitle | default: '' | escape }}",
+        url: "{{ page.url | relative_url }}",
+          name: "{{ page.name | escape }}",
+            path: "{{ page.path | escape }}",
+              dir: "{{ page.dir | escape }}"
+    },
+    {% endfor %}
+    {% for post in site.posts %}
+    {
+      title: "{{ post.title | default: post.name | escape }}",
+      tiitle: "{{ post.tiitle | default: '' | escape }}",
+        url: "{{ post.url | relative_url }}",
+          name: "{{ post.name | escape }}",
+            path: "{{ post.path | escape }}",
+              dir: "{{ post.dir | escape }}"
+    } {% unless forloop.last %}, {% endunless %}
+    {% endfor %}
+    {% assign content_pages = site.static_files | where_exp: 'f', 'f.path contains "content/_pages/"' | where_exp: 'f', 'f.extname == ".md"' %}
+    {% for f in content_pages %},
+    {
+      title: "{{ f.name | split: '.' | first | escape }}",
+      tiitle: "",
+      url: "{{ f.path | replace: 'content/_pages', '' | replace: '.md', '' | relative_url }}",
+      name: "{{ f.name | escape }}",
+      path: "{{ f.path | remove_first: '/' | escape }}",
+      dir: "{{ f.dir | escape }}"
+    }
+    {% endfor %}
+    ];
+
+    // Generate navigation dynamically
+    (function () {
+      const navLinks = document.getElementById('nav-links');
+      if (!navLinks || !window.fileSystem) return;
+
+      // Define main navigation pages in order
+      const mainNavUrls = ['/', '/about/', '/experience/', '/projects/'];
+      const navLabels = {
+        '/': 'DASHBOARD',
+        '/about/': 'PROFILE',
+        '/experience/': 'LOGS',
+        '/projects/': 'CONSTELLATIONS'
+      };
+
+      mainNavUrls.forEach(url => {
+        const page = window.fileSystem.find(p => p.url === url);
+        if (page) {
+          const link = document.createElement('a');
+          link.href = url; // Keep href for fallback
+          link.className = 'nav-link';
+          link.textContent = `[${navLabels[url]}]`;
+          link.onclick = (e) => {
+            e.preventDefault();
+            // Load page content in terminal
+            fetch(url)
+              .then(res => res.text())
+              .then(html => {
+                // Extract content from HTML
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const content = doc.querySelector('main') || doc.querySelector('article') || doc.body;
+
+                // Open terminal with content
+                const terminal = document.getElementById('reading-overlay');
+                const terminalContent = document.getElementById('reading-content');
+                if (terminal && terminalContent) {
+                  terminalContent.innerHTML = content.innerHTML;
+                  terminal.classList.remove('hidden');
+
+                  // Update UI manager state if accessible, otherwise just toggle class
+                  // We rely on the class 'hidden' for visibility
+                }
+              })
+              .catch(err => {
+                console.error('Failed to load page:', err);
+                // Fallback to normal navigation
+                window.location.href = url;
+              });
+          };
+          navLinks.appendChild(link);
+        }
+      });
+    })();
+  </script>
+
+  <script type="module" src="{{ "/_tech/theme/assets/js/space-scene.js" | relative_url }}"></script>
+  <script type="module" src="{{ "/_tech/theme/assets/js/systems/tutorial.js" | relative_url }}"></script>
+
+</body>
+
+</html>

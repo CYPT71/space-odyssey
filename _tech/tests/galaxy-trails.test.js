@@ -3,7 +3,7 @@
  * @author CYPT71
  */
 
-import { createGalaxyTrails, createAnimatedTrails, updateAnimatedTrails, removeAllTrails } from '../../theme/assets/js/systems/galaxy-trails.js';
+import { createGalaxyTrails, createAnimatedTrails, updateAnimatedTrails, removeAllTrails } from '../theme/assets/js/systems/galaxy-trails.js';
 import * as THREE from 'three';
 
 describe('Galaxy Trails System', () => {

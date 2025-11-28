@@ -3,7 +3,7 @@
  * @author CYPT71
  */
 
-import { createCameraController } from '../../theme/assets/js/systems/camera-controller.js';
+import { createCameraController } from '../theme/assets/js/systems/camera-controller.js';
 import * as THREE from 'three';
 
 describe('Camera Controller', () => {

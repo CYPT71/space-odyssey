@@ -1,0 +1,76 @@
+{
+  "name": "antigravity-space-sim",
+  "version": "3.0.0",
+  "description": "Immersive 3D space simulation portfolio",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint _tech/theme/assets/js/**/*.js",
+    "lint:fix": "eslint _tech/theme/assets/js/**/*.js --fix",
+    "serve": "bundle exec jekyll serve",
+    "build": "bundle exec jekyll build",
+    "precommit": "pre-commit run --all-files"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.23.0",
+    "@babel/preset-env": "^7.23.0",
+    "babel-jest": "^29.7.0",
+    "eslint": "^8.56.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "jest": "^29.7.0",
+    "three": "^0.160.0",
+    "pre-commit": "^1.2.2"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "transform": {
+      "^.+\\.js$": "babel-jest"
+    },
+    "moduleNameMapper": {
+      "^three$": "<rootDir>/tests/__mocks__/three.js",
+      "^three/addons/(.*)$": "<rootDir>/tests/__mocks__/three-addons.js"
+    },
+    "transformIgnorePatterns": [
+      "/node_modules/(?!three/)"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/jest.setup.js"
+    ],
+    "testMatch": [
+      "**/_tech/tests/**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "_tech/theme/assets/js/**/*.js",
+      "!_tech/theme/assets/js/legacy/**",
+      "!_tech/theme/assets/js/space-scene.js",
+      "!**/node_modules/**"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 99,
+        "functions": 99,
+        "lines": 99,
+        "statements": 99
+      }
+    },
+    "coverageReporters": [
+      "text",
+      "text-summary",
+      "html",
+      "lcov"
+    ]
+  },
+  "babel": {
+    "presets": [
+      [
+        "@babel/preset-env",
+        {
+          "targets": {
+            "node": "current"
+          }
+        }
+      ]
+    ]
+  }
+}

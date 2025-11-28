@@ -8,7 +8,8 @@ import { createShipControls } from '../theme/assets/js/systems/ship-controls.js'
 // Mock THREE.js Object3D
 class MockShipGroup {
     constructor() {
-        this.position = { x: 0, y: 0, z: 0, add: () => { } };
+        const THREE = require('three');
+        this.position = new THREE.Vector3(0, 0, 0);
         this.rotation = { x: 0, y: 0, z: 0 };
         this.translateZ = (distance) => {
             this.position.z += distance;

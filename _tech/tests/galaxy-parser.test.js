@@ -3,7 +3,7 @@
  * @author CYPT71
  */
 
-import { isContentFile, parseFileSystem } from '../../theme/assets/js/galaxy/parser.js';
+import { isContentFile, parseFileSystem } from '../theme/assets/js/galaxy/parser.js';
 
 describe('Galaxy Parser', () => {
     describe('isContentFile', () => {

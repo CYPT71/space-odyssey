@@ -3,7 +3,7 @@
  * @author CYPT71
  */
 
-import { createPhysicsSystem } from '../../theme/assets/js/core/physics.js';
+import { createPhysicsSystem } from '../theme/assets/js/core/physics.js';
 
 // Mock systems
 const createMockSystems = () => ({
@@ -11,7 +11,8 @@ const createMockSystems = () => ({
         update: jest.fn(),
         getSpeed: jest.fn(() => 1000),
         getWarpFactor: jest.fn(() => 2),
-        applyGravity: jest.fn()
+        applyGravity: jest.fn(),
+        isWarp20Active: jest.fn(() => false)
     },
     shipGroup: {
         position: { x: 0, y: 0, z: 0 }
@@ -81,7 +82,7 @@ describe('Physics System', () => {
 
     test('should apply gravity to planets', () => {
         const mockPlanets = [
-            { position: { x: 100, y: 0, z: 0 }, userData: { rotationSpeed: 0.001 } }
+            { position: { x: 100, y: 0, z: 0, distanceTo: () => 100 }, rotation: { y: 0 }, userData: { rotationSpeed: 0.001 } }
         ];
         systems.galaxyManager.getAllObjects.mockReturnValue(mockPlanets);
 
@@ -93,7 +94,15 @@ describe('Physics System', () => {
     test('should update HUD target when closest object exists', () => {
         const mockClosest = {
             type: 'planet',
-            planetData: { name: 'Test Planet', title: 'Test Title' }
+            planetData: { name: 'Test Planet', title: 'Test Title' },
+            obj: {
+                uuid: 'uuid-1',
+                userData: { planetData: { title: 'Test Title' } },
+                getWorldPosition: jest.fn(),
+                rotation: { y: 0 },
+                geometry: { boundingSphere: { radius: 1 } },
+                add: jest.fn()
+            }
         };
         systems.galaxyManager.findClosest.mockReturnValue(mockClosest);
 

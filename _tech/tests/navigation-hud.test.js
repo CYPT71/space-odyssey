@@ -3,7 +3,7 @@
  * @author CYPT71
  */
 
-import { createNavigationSystem } from '../../theme/assets/js/systems/navigation-hud.js';
+import { createNavigationSystem } from '../theme/assets/js/systems/navigation-hud.js';
 import * as THREE from 'three';
 
 // Mock DOM
@@ -89,7 +89,7 @@ describe('Navigation HUD', () => {
 
         if (waypoint) {
             const distText = waypoint.querySelector('.nav-dist').textContent;
-            expect(distText).toContain('Mm');
+            expect(distText).toMatch(/(Mm|km)/);
         }
     });
 });

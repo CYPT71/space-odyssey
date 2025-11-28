@@ -3,10 +3,10 @@
  * @author CYPT71
  */
 
-import { createProceduralPlanets } from '../../theme/assets/js/entities/procedural-planets.js';
+import { createProceduralPlanets } from '../theme/assets/js/entities/procedural-planets.js';
 
 // Mock atmosphere system
-jest.mock('../../theme/assets/js/systems/atmosphere-system.js', () => ({
+jest.mock('../theme/assets/js/systems/atmosphere-system.js', () => ({
     addAtmosphere: jest.fn()
 }));
 

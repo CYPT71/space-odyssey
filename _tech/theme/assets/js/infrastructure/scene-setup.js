@@ -22,7 +22,9 @@ export function initScene() {
     // Renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    const coarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    const pixelRatio = coarsePointer ? Math.min(window.devicePixelRatio, 1.5) : window.devicePixelRatio;
+    renderer.setPixelRatio(pixelRatio);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
     document.getElementById('webgl-container').appendChild(renderer.domElement);

@@ -35,6 +35,8 @@ import { createPhysicsSystem } from './core/physics.js';
 import { createInputSystem } from './core/input.js';
 import { updateMinimap, updateCompass } from './core/hud-utils.js';
 import { showLoading, hideLoading } from './systems/tutorial.js';
+import { createXRManager } from './xr/xr-manager.js';
+import { isMobile } from './utils/device.js';
 
 // ============================================================
 // INITIALIZATION
@@ -44,6 +46,10 @@ import { showLoading, hideLoading } from './systems/tutorial.js';
 const { scene, camera, renderer, composer, labelRenderer } = initScene();
 showLoading();
 const clock = new THREE.Clock();
+const mobileMode = isMobile();
+if (mobileMode) {
+    document.body.classList.add('mobile-mode');
+}
 
 // Create the player's ship
 const { shipGroup, updateLighting } = createShip(scene);
@@ -119,7 +125,14 @@ const scannerSystem = createScannerSystem(scene, camera, audioSystem);
 const engagementSystem = createEngagementSystem();
 
 // Create core systems
-const renderingSystem = createRenderingSystem({ scene, camera, composer, labelRenderer });
+const renderingSystem = createRenderingSystem({
+    scene,
+    camera,
+    renderer,
+    composer,
+    labelRenderer,
+    usePostProcessing: !mobileMode
+});
 
 const physicsSystem = createPhysicsSystem({
     shipControls,
@@ -169,26 +182,75 @@ uiManager.activateWarpBoost = function () {
 // ============================================================
 
 let frameCount = 0;
+let xrActive = false;
 
-function animate() {
-    requestAnimationFrame(animate);
+const tick = () => {
+    const delta = clock.getDelta();
     frameCount++;
 
-    const delta = clock.getDelta();
-
-    // Update physics/game logic
     physicsSystem.update(delta);
-
-    // Update HUD utilities
     updateMinimap(shipGroup, galaxyManager, frameCount);
     updateCompass(shipGroup, galaxyManager, frameCount);
     radar.update();
-
-    // Render frame
     renderingSystem.render();
+};
+
+function animate() {
+    if (xrActive) return;
+    requestAnimationFrame(animate);
+    tick();
 }
 
-// Start the animation loop
+// XR manager (progressive enhancement)
+const xrManager = createXRManager({
+    renderer,
+    onXRFrame: () => {
+        xrActive = true;
+        renderingSystem.setXRActive(true);
+        tick();
+    }
+});
+
+const enterXRMode = async () => {
+    if (!xrManager.hasXR || xrActive) return false;
+    xrActive = true;
+    renderingSystem.setXRActive(true);
+    const ok = await xrManager.enterXR();
+    if (!ok) {
+        xrActive = false;
+        renderingSystem.setXRActive(false);
+        animate();
+    }
+    return ok;
+};
+
+const exitXRMode = async () => {
+    if (!xrActive) return;
+    await xrManager.exitXR();
+    xrActive = false;
+    renderingSystem.setXRActive(false);
+    clock.getDelta(); // reset delta so next frame isn't huge
+    animate();
+};
+
+// XR toggle button (hidden when unsupported)
+const xrButton = document.createElement('button');
+xrButton.id = 'xr-toggle';
+xrButton.textContent = 'Enter VR (experimental)';
+xrButton.className = 'xr-toggle-btn';
+document.body.appendChild(xrButton);
+xrButton.style.display = xrManager.hasXR ? 'inline-flex' : 'none';
+xrButton.addEventListener('click', async () => {
+    if (xrActive) {
+        await exitXRMode();
+        xrButton.textContent = 'Enter VR (experimental)';
+    } else {
+        const ok = await enterXRMode();
+        if (ok) xrButton.textContent = 'Exit VR';
+    }
+});
+
+// Start the animation loop (non-XR)
 animate();
 
 // Implement planet teleportation (legacy support)

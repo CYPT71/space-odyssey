@@ -192,8 +192,12 @@
   </div>
 
   <!-- HUD Minimap -->
+  <button id="mobile-known-toggle" class="hud-button hud-button--ghost" aria-label="Open known objects">📡 KNOWN</button>
   <div id="hud-minimap">
-    <h3>📡 KNOWN OBJECTS</h3>
+    <div class="minimap-header">
+      <h3>📡 KNOWN OBJECTS</h3>
+      <button id="mobile-known-close" class="hud-button hud-button--ghost">✕ CLOSE</button>
+    </div>
     <div id="minimap-list"></div>
   </div>
 
@@ -265,6 +269,18 @@
   <script>
     // Expose base URL prefix (relative_url aware) so modules can strip/restore when normalizing paths
     window.siteBase = ("{{ '/' | relative_url }}").replace(/\/+$/, '');
+    // Mobile known objects toggle
+    (function () {
+      const toggle = document.getElementById('mobile-known-toggle');
+      const closeBtn = document.getElementById('mobile-known-close');
+      const isMobile = () => window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+      const open = () => document.body.classList.add('mobile-known-open');
+      const close = () => document.body.classList.remove('mobile-known-open');
+      if (toggle && closeBtn && isMobile()) {
+        toggle.addEventListener('click', open);
+        closeBtn.addEventListener('click', close);
+      }
+    })();
 
     // Inject complete file system for galaxy generation
     // Inject complete file system for galaxy generation

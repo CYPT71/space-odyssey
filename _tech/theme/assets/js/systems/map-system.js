@@ -5,6 +5,7 @@
  */
 
 import * as THREE from 'three';
+import { isMobile } from '../utils/device.js';
 
 /**
  * Creates the map system
@@ -153,6 +154,31 @@ export function createMapSystem(systems) {
             const userData = closest.userData || {};
             // Check autopilot confirmation setting
             const requireConfirmation = localStorage.getItem('autopilotConfirmation') !== 'false';
+
+            // On mobile: clicking opens terminal instead of autopilot when planet
+            if (isMobile() && userData.planetData && userData.planetData.url) {
+                fetch(userData.planetData.url)
+                    .then(res => res.text())
+                    .then(html => {
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(html, 'text/html');
+                        const content = doc.querySelector('main') || doc.querySelector('article') || doc.body;
+                        const terminal = document.getElementById('reading-overlay');
+                        const terminalContent = document.getElementById('reading-content');
+                        if (terminal && terminalContent) {
+                            terminalContent.innerHTML = content.innerHTML;
+                            terminal.classList.remove('hidden');
+                            if (window.uiManager && window.uiManager.openReadingMode) {
+                                window.uiManager.openReadingMode();
+                            }
+                        }
+                    })
+                    .catch(() => {
+                        // fallback to autopilot if fetch fails
+                        window.dispatchEvent(new CustomEvent('teleportRequest', { detail: { uuid: closest.uuid } }));
+                    });
+                return;
+            }
 
             const engageAutopilot = () => {
                 const targetPos = new THREE.Vector3();

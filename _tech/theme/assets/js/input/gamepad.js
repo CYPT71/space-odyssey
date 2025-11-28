@@ -7,6 +7,7 @@ const applyDeadzone = (v) => (Math.abs(v) < DEADZONE ? 0 : v);
 export const startGamepadLoop = (shipControls, actions = {}) => {
     if (typeof window === 'undefined' || !shipControls) return () => {};
     let rafId = null;
+    const prevButtons = [];
 
     const tick = () => {
         const pads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -22,10 +23,15 @@ export const startGamepadLoop = (shipControls, actions = {}) => {
             shipControls.setPitch(-ry);
 
             const btn = (i) => pad.buttons[i] && pad.buttons[i].pressed;
-            if (btn(0) && actions.autopilot) actions.autopilot();     // A
-            if (btn(1) && actions.stop) actions.stop();               // B
-            if (btn(4) && actions.cycleTarget) actions.cycleTarget(); // LB
-            if (btn(5) && actions.cycleTarget) actions.cycleTarget(); // RB
+            const onPress = (i, fn) => {
+                const pressed = btn(i);
+                if (pressed && !prevButtons[i] && fn) fn();
+                prevButtons[i] = pressed;
+            };
+            onPress(0, actions.autopilot);     // A
+            onPress(1, actions.stop);          // B
+            onPress(4, actions.cycleTarget);   // LB
+            onPress(5, actions.cycleTarget);   // RB
         }
         rafId = requestAnimationFrame(tick);
     };

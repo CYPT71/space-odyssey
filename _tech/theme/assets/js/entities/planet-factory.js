@@ -5,6 +5,8 @@
 import * as THREE from 'three';
 import { CSS2DObject } from '../infrastructure/css2d-renderer.js';
 import { addAtmosphere } from '../systems/atmosphere-system.js';
+import { openObjectTerminal } from '../core/hud-utils.js';
+import { isMobile } from '../utils/device.js';
 
 /**
  * Creates a planet mesh similar to procedural planets
@@ -50,6 +52,14 @@ export function createPlanetLikeProcedural({ name, url, size, color } = {}) {
     const div = document.createElement('div');
     div.className = 'planet-label';
     div.textContent = name || 'Planet';
+    div.style.pointerEvents = 'auto';
+    div.style.cursor = 'pointer';
+    div.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!isMobile()) return;
+        if (openObjectTerminal(mesh)) return;
+        if (window.teleportTo) window.teleportTo(mesh.uuid);
+    });
     const label = new CSS2DObject(div);
     label.position.set(0, planetSize * 1.2, 0);
     mesh.add(label);

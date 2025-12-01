@@ -30,14 +30,15 @@
     <div class="nav-links" id="nav-links">
       <!-- Navigation will be generated dynamically -->
     </div>
+    <div class="nav-actions">
+      <button id="settings-button" title="Controls Settings">⚙️</button>
+      <button id="reader-mode-toggle" class="nav-reader-btn" title="Open Reader">READ</button>
+    </div>
   </nav>
 
   <!-- Main Content (Terminal) -->
   <!-- Main Content (Terminal) -->
   <!-- Content is now inside #reading-overlay below -->
-
-  <!-- Settings Button (Gear) -->
-  <button id="settings-button" title="Controls Settings">⚙️</button>
 
   <!-- Settings Panel -->
   <div id="settings-panel">
@@ -247,15 +248,18 @@
     </div>
   </div>
 
-  <!-- Reading Overlay (Terminal) -->
-  <!-- Reading Overlay (Terminal) -->
-  <div id="reading-overlay">
+  <!-- Reading Overlay (Terminal + Library) -->
+  <div id="reading-overlay" class="hidden">
     <div class="reading-header">
       <h3 class="reading-title">INCOMING TRANSMISSION</h3>
       <div style="display:flex;gap:6px;align-items:center;">
         <button id="reading-back">◀ BACK</button>
         <button id="reading-close">✕ CLOSE</button>
       </div>
+    </div>
+    <div id="reader-panel">
+      <input id="reader-search" type="search" placeholder="Search transmissions...">
+      <div id="reader-cards"></div>
     </div>
     <div id="reading-content">
       {{ content }}
@@ -267,112 +271,57 @@
   </footer>
 
   <script>
-    // Expose base URL prefix (relative_url aware) so modules can strip/restore when normalizing paths
-    window.siteBase = ("{{ '/' | relative_url }}").replace(/\/+$/, '');
-    // Mobile known objects toggle
-    (function () {
-      const toggle = document.getElementById('mobile-known-toggle');
-      const closeBtn = document.getElementById('mobile-known-close');
-      const isMobile = () => window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
-      const open = () => document.body.classList.add('mobile-known-open');
-      const close = () => document.body.classList.remove('mobile-known-open');
-      if (toggle && closeBtn && isMobile()) {
-        toggle.addEventListener('click', open);
-        closeBtn.addEventListener('click', close);
-      }
-    })();
-
-    // Inject complete file system for galaxy generation
-    // Inject complete file system for galaxy generation
-    window.fileSystem = [
-      {% for page in site.pages %}
-    {
-      title: "{{ page.title | default: page.name | escape }}",
-      tiitle: "{{ page.tiitle | default: '' | escape }}",
-        url: "{{ page.url | relative_url }}",
-          name: "{{ page.name | escape }}",
-            path: "{{ page.path | escape }}",
-              dir: "{{ page.dir | escape }}"
-    },
-    {% endfor %}
-    {% for post in site.posts %}
-    {
-      title: "{{ post.title | default: post.name | escape }}",
-      tiitle: "{{ post.tiitle | default: '' | escape }}",
-        url: "{{ post.url | relative_url }}",
-          name: "{{ post.name | escape }}",
-            path: "{{ post.path | escape }}",
-              dir: "{{ post.dir | escape }}"
-    } {% unless forloop.last %}, {% endunless %}
-    {% endfor %}
-    {% assign content_pages = site.static_files | where_exp: 'f', 'f.path contains "content/_pages/"' | where_exp: 'f', 'f.extname == ".md"' %}
-    {% for f in content_pages %},
-    {
-      title: "{{ f.name | split: '.' | first | escape }}",
-      tiitle: "",
-      url: "{{ f.path | replace: 'content/_pages', '' | replace: '.md', '' | relative_url }}",
-      name: "{{ f.name | escape }}",
-      path: "{{ f.path | remove_first: '/' | escape }}",
-      dir: "{{ f.dir | escape }}"
-    }
-    {% endfor %}
-    ];
-
-    // Generate navigation dynamically
-    (function () {
-      const navLinks = document.getElementById('nav-links');
-      if (!navLinks || !window.fileSystem) return;
-
-      // Define main navigation pages in order
-      const mainNavUrls = ['/', '/about/', '/experience/', '/projects/'];
-      const navLabels = {
-        '/': 'DASHBOARD',
-        '/about/': 'PROFILE',
-        '/experience/': 'LOGS',
-        '/projects/': 'CONSTELLATIONS'
-      };
-
-      mainNavUrls.forEach(url => {
-        const page = window.fileSystem.find(p => p.url === url);
-        if (page) {
-          const link = document.createElement('a');
-          link.href = url; // Keep href for fallback
-          link.className = 'nav-link';
-          link.textContent = `[${navLabels[url]}]`;
-          link.onclick = (e) => {
-            e.preventDefault();
-            // Load page content in terminal
-            fetch(url)
-              .then(res => res.text())
-              .then(html => {
-                // Extract content from HTML
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                const content = doc.querySelector('main') || doc.querySelector('article') || doc.body;
-
-                // Open terminal with content
-                const terminal = document.getElementById('reading-overlay');
-                const terminalContent = document.getElementById('reading-content');
-                if (terminal && terminalContent) {
-                  terminalContent.innerHTML = content.innerHTML;
-                  terminal.classList.remove('hidden');
-
-                  // Update UI manager state if accessible, otherwise just toggle class
-                  // We rely on the class 'hidden' for visibility
-                }
-              })
-              .catch(err => {
-                console.error('Failed to load page:', err);
-                // Fallback to normal navigation
-                window.location.href = url;
-              });
-          };
-          navLinks.appendChild(link);
+    // Seed IndexedDB with all pages/posts (static-friendly, no embedded JSON needed elsewhere)
+    (function initIndexedDB() {
+      if (!('indexedDB' in window)) return;
+      const req = indexedDB.open('spaceOddity', 1);
+      req.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains('pages')) {
+          const store = db.createObjectStore('pages', { keyPath: 'url' });
+          store.createIndex('title', 'title');
         }
-      });
+      };
+      req.onsuccess = (event) => {
+        const db = event.target.result;
+        const tx = db.transaction('pages', 'readwrite');
+        const store = tx.objectStore('pages');
+        const entries = [
+          {% assign entries_comma = false %}
+          {% for page in site.pages %}
+          {
+            url: {{ page.url | jsonify }},
+            title: {{ page.title | jsonify }},
+            name: {{ page.name | jsonify }},
+            path: {{ page.path | jsonify }},
+            dir: {{ page.dir | jsonify }},
+            content: {{ page.content | jsonify }},
+            date: {{ page.date | jsonify }}
+          }{% assign entries_comma = true %}{% unless forloop.last and site.posts == empty %},{% endunless %}
+          {% endfor %}
+          {% for post in site.posts %}
+          {
+            url: {{ post.url | jsonify }},
+            title: {{ post.title | jsonify }},
+            name: {{ post.name | jsonify }},
+            path: {{ post.path | jsonify }},
+            dir: {{ post.dir | jsonify }},
+            content: {{ post.content | jsonify }},
+            date: {{ post.date | jsonify }}
+          }{% unless forloop.last %},{% endunless %}
+          {% endfor %}
+        ];
+        entries.forEach((entry) => {
+          if (entry && entry.url) store.put(entry);
+        });
+        tx.oncomplete = () => console.log('Jekyll content loaded to IndexedDB');
+        tx.onerror = (e) => console.warn('IndexedDB load failed', e?.target?.error || e);
+      };
+      req.onerror = (e) => console.warn('IndexedDB open failed', e?.target?.error || e);
     })();
   </script>
 
+  <script type="module" src="{{ "/assets/js/init/site-init.js" | relative_url }}"></script>
   <script type="module" src="{{ "/assets/js/space-scene.js" | relative_url }}"></script>
   <script type="module" src="{{ "/assets/js/systems/tutorial.js" | relative_url }}"></script>
 

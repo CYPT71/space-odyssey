@@ -1,7 +1,7 @@
 /**
  * @fileoverview Optional gamepad loop mapping sticks -> ship controls.
  */
-const DEADZONE = 0.15;
+const DEADZONE = 0.22;
 const applyDeadzone = (v) => (Math.abs(v) < DEADZONE ? 0 : v);
 
 export const startGamepadLoop = (shipControls, actions = {}) => {

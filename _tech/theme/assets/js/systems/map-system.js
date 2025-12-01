@@ -6,6 +6,7 @@
 
 import * as THREE from 'three';
 import { isMobile } from '../utils/device.js';
+import { loadPageContent } from '../init/content-loader.js';
 
 /**
  * Creates the map system
@@ -157,8 +158,7 @@ export function createMapSystem(systems) {
 
             // On mobile: clicking opens terminal instead of autopilot when planet
             if (isMobile() && userData.planetData && userData.planetData.url) {
-                fetch(userData.planetData.url)
-                    .then(res => res.text())
+                loadPageContent(userData.planetData.url)
                     .then(html => {
                         const parser = new DOMParser();
                         const doc = parser.parseFromString(html, 'text/html');
@@ -167,7 +167,7 @@ export function createMapSystem(systems) {
                         const terminalContent = document.getElementById('reading-content');
                         if (terminal && terminalContent) {
                             // Avoid injecting raw HTML; render as plain text to prevent XSS
-                            terminalContent.textContent = content ? content.textContent || '' : '';
+                            terminalContent.textContent = content ? content.textContent || '' : html;
                             terminal.classList.remove('hidden');
                             if (window.uiManager && window.uiManager.openReadingMode) {
                                 window.uiManager.openReadingMode();
@@ -175,7 +175,7 @@ export function createMapSystem(systems) {
                         }
                     })
                     .catch(() => {
-                        // fallback to autopilot if fetch fails
+                        // fallback to autopilot if load fails
                         window.dispatchEvent(new CustomEvent('teleportRequest', { detail: { uuid: closest.uuid } }));
                     });
                 return;

@@ -3,6 +3,7 @@
  */
 
 const qs = (sel) => document.querySelector(sel);
+const isMobile = () => window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
 
 function getRect(el) {
   const r = el.getBoundingClientRect();
@@ -52,8 +53,17 @@ export function createTutorial() {
     idx = Math.max(0, Math.min(i, steps.length - 1));
     const s = steps[idx];
     const el = typeof s.selector === 'string' ? qs(s.selector) : s.element;
-    if (!el) { console.warn('Tutorial step target not found', s); return; }
+    if (!el) {
+      console.warn('Tutorial step target not found', s);
+      if (idx < steps.length - 1) return showStep(idx + 1);
+      return;
+    }
     const rect = getRect(el);
+    if (!rect.w && !rect.h) {
+      // Skip hidden items (mobile HUD elements, etc.)
+      if (idx < steps.length - 1) return showStep(idx + 1);
+      return;
+    }
     highlight.style.left = rect.x + 'px';
     highlight.style.top = rect.y + 'px';
     highlight.style.width = rect.w + 'px';
@@ -70,7 +80,7 @@ export function createTutorial() {
 
     // Gate: wait for controls if step requires keys
     clearGate();
-    if (Array.isArray(s.keys) && s.keys.length) {
+    if (Array.isArray(s.keys) && s.keys.length && !isMobile()) {
       btnNext.disabled = true;
       keyListener = (e) => {
         const k = e.key.toLowerCase();

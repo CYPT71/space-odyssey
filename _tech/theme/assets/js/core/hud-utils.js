@@ -6,6 +6,8 @@
 
 import * as THREE from 'three';
 import { getObjectName, getObjectType, getIconForType } from './space-object-utils.js';
+import { isMobile } from '../utils/device.js';
+import { loadPageContent } from '../init/content-loader.js';
 
 const scratchVector = new THREE.Vector3();
 const scratchVector2 = new THREE.Vector3();
@@ -14,6 +16,39 @@ const scratchVector2 = new THREE.Vector3();
 const formatDistance = (d) => {
     const km = Math.round(d / 1000);
     return `${km.toLocaleString()} km`;
+};
+
+/**
+ * Opens terminal content for a space object if it has a URL.
+ * @param {THREE.Object3D} obj
+ * @returns {boolean} true if handled
+ */
+export const openObjectTerminal = (obj) => {
+    if (!obj) return false;
+    const ud = obj.userData || {};
+    const url = ud.planetData?.url;
+    if (!url) return false;
+
+    const terminal = document.getElementById('reading-overlay');
+    const terminalContent = document.getElementById('reading-content');
+    if (!terminal || !terminalContent) return false;
+
+    loadPageContent(url)
+        .then((html) => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const content = doc.querySelector('main') || doc.querySelector('article') || doc.body;
+            terminalContent.innerHTML = content ? content.innerHTML : html;
+            terminal.classList.remove('hidden');
+            if (window.uiManager && window.uiManager.openReadingMode) {
+                window.uiManager.openReadingMode();
+            }
+            if (window.inputSystem && window.inputSystem.interceptLinksInContent) {
+                window.inputSystem.interceptLinksInContent(terminalContent);
+            }
+        })
+        .catch(err => console.warn('Failed to open terminal for object', err));
+    return true;
 };
 
 /**
@@ -27,7 +62,44 @@ export function updateMinimap(shipGroup, galaxyManager, frameCount) {
     if (frameCount % 30 !== 0) return;
 
     const minimapList = document.getElementById('minimap-list');
-    if (!minimapList) return;
+    const hudMinimap = document.getElementById('hud-minimap');
+    if (!minimapList || !hudMinimap) return;
+
+    // Search bar (desktop + mobile)
+    if (!document.getElementById('minimap-search')) {
+        const wrapper = document.createElement('div');
+        wrapper.id = 'minimap-search-wrapper';
+
+        const search = document.createElement('input');
+        search.id = 'minimap-search';
+        search.type = 'search';
+        search.placeholder = isMobile()
+            ? 'Filter objects…'
+            : 'Filter objects… (#tag or /regex/)';
+        search.value = window.minimapSearchTerm || '';
+        search.autocapitalize = 'none';
+        search.autocomplete = 'off';
+        search.spellcheck = false;
+        search.addEventListener('input', (e) => {
+            if (isMobile()) {
+                e.target.value = e.target.value.replace(/\s+/g, '');
+            }
+            window.minimapSearchTerm = e.target.value;
+        });
+        // Forward keystrokes to global handlers so ship controls stay responsive
+        search.addEventListener('keydown', (e) => {
+            if (!isMobile()) {
+                if (e.key === 'Escape') search.blur();
+                const forwarded = new KeyboardEvent('keydown', e);
+                window.dispatchEvent(forwarded);
+            }
+        });
+        wrapper.appendChild(search);
+
+        hudMinimap.insertBefore(wrapper, minimapList);
+    }
+    const rawTerm = window.minimapSearchTerm || '';
+    const searchTerm = rawTerm.toLowerCase();
 
     // Check if toggle button exists
     let toggleBtn = document.getElementById('minimap-toggle');
@@ -78,7 +150,8 @@ export function updateMinimap(shipGroup, galaxyManager, frameCount) {
     const categories = {
         rootPlanets: [],
         gasClouds: [],
-        nebulae: []
+        nebulae: [],
+        galaxies: []
     };
 
     for (let i = 0; i < allObjects.length; i++) {
@@ -100,7 +173,8 @@ export function updateMinimap(shipGroup, galaxyManager, frameCount) {
         const item = {
             obj,
             distance: dist,
-            name: preferredName
+            name: preferredName,
+            uuid: obj.uuid
         };
 
         const isInsideGalaxy = (node) => {
@@ -116,6 +190,8 @@ export function updateMinimap(shipGroup, galaxyManager, frameCount) {
             categories.nebulae.push(item);
         } else if (userData.isGasCloud || userData.cloudData) {
             categories.gasClouds.push(item);
+        } else if (userData.galaxyData || userData.isGalaxy) {
+            categories.galaxies.push(item);
         } else if (userData.planetData && !isInsideGalaxy(obj)) {
             categories.rootPlanets.push(item);
         }
@@ -127,13 +203,30 @@ export function updateMinimap(shipGroup, galaxyManager, frameCount) {
     const limit = isExpanded ? 100 : 8;
 
     // --- DOM Sync Helpers ---
-
     const syncCategory = (idSuffix, title, color, items, isCollapsed, toggleKey) => {
+        let filteredItems = items;
+        if (searchTerm) {
+            // Desktop-only: allow regex (/expr/) and tag (#tag)
+            if (!isMobile() && rawTerm.startsWith('/') && rawTerm.endsWith('/') && rawTerm.length > 2) {
+                try {
+                    const re = new RegExp(rawTerm.slice(1, -1), 'i');
+                    filteredItems = items.filter(it => re.test(it.name || ''));
+                } catch (_) {
+                    filteredItems = items;
+                }
+            } else if (!isMobile() && rawTerm.startsWith('#')) {
+                const tag = rawTerm.slice(1).toLowerCase();
+                filteredItems = items.filter(it => (it.name || '').toLowerCase().includes(tag));
+            } else {
+                filteredItems = items.filter(it => (it.name || '').toLowerCase().includes(searchTerm));
+            }
+        }
+        const useItems = filteredItems;
         const catId = `minimap-cat-${idSuffix}`;
         let catDiv = document.getElementById(catId);
 
         // Hide if empty
-        if (items.length === 0) {
+        if (useItems.length === 0) {
             if (catDiv) catDiv.style.display = 'none';
             return;
         }
@@ -183,7 +276,7 @@ export function updateMinimap(shipGroup, galaxyManager, frameCount) {
             itemsContainer.style.display = 'none';
         } else {
             itemsContainer.style.display = 'block';
-            syncItems(itemsContainer, items, limit);
+            syncItems(itemsContainer, useItems, limit);
         }
     };
 
@@ -202,7 +295,15 @@ export function updateMinimap(shipGroup, galaxyManager, frameCount) {
                 el.className = 'minimap-item';
                 el.style.cursor = 'pointer';
                 // Base styles
-                el.onclick = item.onClick || (() => window.teleportTo(item.uuid));
+                el.onclick = item.onClick || (() => {
+                    if (isMobile()) {
+                        document.body.classList.remove('mobile-known-open');
+                    }
+                    if (isMobile() && openObjectTerminal(item.obj)) return;
+                    if (window.teleportTo) {
+                        window.teleportTo(item.uuid);
+                    }
+                });
             }
 
             // Update content
@@ -356,14 +457,17 @@ export function updateMinimap(shipGroup, galaxyManager, frameCount) {
     syncCategory('galaxies', '🌌 Galaxies', '#FF00FF', galaxyRows, !!window.minimapState.galaxiesCollapsed, 'galaxies');
 
     // 2. Root Planets
-    const rootPlanetRows = categories.rootPlanets.map(p => ({
-        uuid: p.obj.uuid,
-        name: p.name.replace('🌍 ', ''), // Remove icon if added by getObjectName
-        distance: p.distance,
-        icon: '🌍',
-        style: { paddingLeft: '12px' }
-    }));
-    syncCategory('planets', 'Planets', '#00F0FF', rootPlanetRows);
+    const rootPlanetRows = categories.rootPlanets.map(p => {
+        const rawName = typeof p.name === 'string' ? p.name : (p.name || p.obj?.name || 'Planet');
+        return {
+            uuid: p.obj.uuid,
+            name: rawName.replace ? rawName.replace('🌍 ', '') : rawName,
+            distance: p.distance,
+            icon: '🌍',
+            style: { paddingLeft: '12px' }
+        };
+    });
+    syncCategory('planets', '🌍 Planets', '#00F0FF', rootPlanetRows, !!window.minimapState.planetsCollapsed, 'planets');
 
     // 3. Gas Clouds
     const cloudRows = [];
@@ -439,7 +543,7 @@ export function updateMinimap(shipGroup, galaxyManager, frameCount) {
         icon: '✨',
         style: { color: '#FF88FF', paddingLeft: '12px' }
     }));
-    syncCategory('nebulae', 'Nebulae', '#FF88FF', nebulaItems);
+    syncCategory('nebulae', '✨ Nebulae', '#FF88FF', nebulaItems, !!window.minimapState.nebulaCollapsed, 'nebulae');
 }
 
 /**

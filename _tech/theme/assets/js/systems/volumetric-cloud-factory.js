@@ -6,6 +6,8 @@
 import * as THREE from 'three';
 import { CSS2DObject } from '../infrastructure/css2d-renderer.js';
 import { mulAdd } from '../native/native-math.js';
+import { openObjectTerminal } from '../core/hud-utils.js';
+import { isMobile } from '../utils/device.js';
 
 const colorCache = new Map();
 const materialCache = new Map();
@@ -141,6 +143,14 @@ export const createVolumetricCloud = ({
     const labelDiv = document.createElement('div');
     labelDiv.className = labelClass;
     labelDiv.textContent = labelTextFn(name);
+    labelDiv.style.pointerEvents = 'auto';
+    labelDiv.style.cursor = 'pointer';
+    labelDiv.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!isMobile()) return;
+        if (openObjectTerminal(points)) return;
+        if (window.teleportTo) window.teleportTo(points.uuid);
+    });
     const label = new CSS2DObject(labelDiv);
     label.position.set(0, labelHeightFn(radius), 0);
     points.add(label);

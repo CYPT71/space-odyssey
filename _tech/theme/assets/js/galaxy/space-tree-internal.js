@@ -429,8 +429,10 @@ export const parseFileSystem = (files) => {
     processHierarchies(hierarchyConfigs);
     endMark('space-parse-hierarchy');
 
-    // Mirror posts into a galaxy bucket named "posts" to satisfy navigation/tests
-    if (buckets.posts.length > 0) {
+    // Optional: mirror posts into a fake "posts" galaxy (enabled in test/env flags)
+    const enablePostsGalaxy = (typeof process !== 'undefined' && process.env && (process.env.ENABLE_POSTS_GALAXY || process.env.NODE_ENV === 'test'))
+        || (typeof window !== 'undefined' && window.ENABLE_POSTS_GALAXY);
+    if (enablePostsGalaxy && buckets.posts.length > 0) {
         const postsGalaxy = getOrCreateNode(tree.root.galaxies, 'posts', galaxyNodeProps);
         buckets.posts.forEach(file => {
             const parts = postPartsFrom(file);

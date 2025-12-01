@@ -16,6 +16,12 @@ export const createSettingsPanel = () => {
     const closeBtn = panel?.querySelector('.close-settings');
     const saveBtn = panel?.querySelector('.settings-btn:not(.reset)');
     const resetBtn = panel?.querySelector('.settings-btn.reset');
+    const isMobile = () => window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+
+    // Hide gear on mobile; if needed, hook it to AR entry instead
+    if (settingsBtn && isMobile()) {
+        settingsBtn.classList.add('mobile-hidden');
+    }
 
     let currentRecording = null;
 

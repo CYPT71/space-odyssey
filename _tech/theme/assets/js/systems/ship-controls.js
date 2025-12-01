@@ -25,13 +25,13 @@ const WARP_SPEEDS = {
 };
 
 const ROTATION_CONFIG = {
-    ACCELERATION: 0.003,
-    DECAY: 0.92,
+    ACCELERATION: 0.0018,
+    DECAY: 0.9,
     MAX_BANK_ANGLE: Math.PI / 2.4, // ~75 degrees
     BANK_SPEED: 0.1,
     YAW_BANK_FACTOR: 15,
     STRAFE_BANK_FACTOR: 0.5,
-    INPUT_SCALE: 1e-5,
+    INPUT_SCALE: 6e-6,
     ROLL_FROM_STRAFE: 1.2, // amplify roll when using A/E
     ROLL_GAIN: 2.0       // faster roll with R/F
 };
@@ -158,8 +158,9 @@ const applyRotationalInertia = (state, controls) => {
     state.rotVel.z *= DECAY;
 
     // Analog (touch/gamepad) contributions
-    if (state.axes.yaw) state.rotVel.y += (-state.axes.yaw) * ACCELERATION * 1.5;
-    if (state.axes.pitch) state.rotVel.x += (-state.axes.pitch) * ACCELERATION * 1.5;
+    if (state.axes.yaw) state.rotVel.y += (-state.axes.yaw) * ACCELERATION * 1.0;
+    if (state.axes.pitch) state.rotVel.x += (-state.axes.pitch) * ACCELERATION * 1.0;
+    if (state.axes.strafe) state.rotVel.z += (-state.axes.strafe) * ACCELERATION * ROTATION_CONFIG.ROLL_FROM_STRAFE;
 };
 
 /**
@@ -228,7 +229,7 @@ const applyForwardMovement = (shipGroup, state) => {
  * @param {Object} controls - Control mappings
  */
 const applyStrafeMovement = (shipGroup, state, controls) => {
-    const speed = PHYSICS.VERTICAL_SPEED * MOVEMENT_CONFIG.STRAFE_MULTIPLIER;
+    const speed = PHYSICS.VERTICAL_SPEED * (MOVEMENT_CONFIG.STRAFE_MULTIPLIER * 0.7);
 
     if (isKeyPressed(state, controls.strafeLeft)) shipGroup.translateX(-speed);
     if (isKeyPressed(state, controls.strafeRight)) shipGroup.translateX(speed);
@@ -443,6 +444,7 @@ const isKeyPressed = (state, key) => {
 export const createShipControls = (shipGroup) => {
     let controls = loadControlMappings();
     const state = createShipState();
+    let analogProfile = 'default'; // 'default' | 'mobile'
 
     // Listen for control updates
     window.addEventListener('controlsUpdated', () => {
@@ -499,10 +501,22 @@ export const createShipControls = (shipGroup) => {
             applyRotation(shipGroup, state);
         } else {
             // Manual Control
-            // Analog forward/back sets impulse speed directly (non-warp)
+            // Analog forward/back mapping (mobile profile can drive warp)
             if (state.axes.forward) {
-                state.warpLevel = 0;
-                state.speed = state.axes.forward * WARP_SPEEDS[0];
+                if (analogProfile === 'mobile') {
+                    if (state.axes.forward > 0) {
+                        // Scale to warp 0-5 by stick magnitude
+                        const targetWarp = Math.min(5, Math.max(0, Math.round(state.axes.forward * 5)));
+                        state.warpLevel = targetWarp;
+                        state.speed = calculateSpeed(targetWarp) * state.axes.forward;
+                    } else {
+                        state.warpLevel = 0;
+                        state.speed = state.axes.forward * (WARP_SPEEDS[0] * 0.6);
+                    }
+                } else {
+                    state.warpLevel = 0;
+                    state.speed = state.axes.forward * (WARP_SPEEDS[0] * 0.6);
+                }
             }
             applyForwardMovement(shipGroup, state);
             applyRotationalInertia(state, controls);
@@ -555,6 +569,7 @@ export const createShipControls = (shipGroup) => {
         getWarpFactor: () => state.warpLevel,
         isFineControlActive: () => state.fineControl,
         setFineControl: (on) => { state.fineControl = !!on; },
+        setAnalogProfile: (profile) => { analogProfile = profile || 'default'; },
         // Analog setters (mobile/gamepad)
         setForward: (v) => {
             state.axes.forward = Math.max(-1, Math.min(1, v));

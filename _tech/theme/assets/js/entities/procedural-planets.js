@@ -7,6 +7,8 @@
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { addAtmosphere } from '../systems/atmosphere-system.js';
+import { openObjectTerminal } from '../core/hud-utils.js';
+import { isMobile } from '../utils/device.js';
 
 // Planet name generators
 const prefixes = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Theta', 'Omega'];
@@ -19,6 +21,8 @@ const suffixes = ['Prime', 'Secundus', 'Tertius', 'Major', 'Minor', 'Proxima', '
  */
 export function createProceduralPlanets(count = 100) {
     const planets = [];
+    const MIN_ATTEMPTS = 50;
+    const MIN_SEPARATION_UNITS = 150_000; // ~150 km safety bubble between planet centers
 
     for (let i = 0; i < count; i++) {
         // Random planet size (MUCH LARGER - 100k to 500k units)
@@ -49,16 +53,37 @@ export function createProceduralPlanets(count = 100) {
         mesh.scale.set(size, size, size);
 
         // Position planet in full 3D space
-        mesh.position.set(
+        const basePos = new THREE.Vector3(
             radius * Math.sin(phi) * Math.cos(theta),
             radius * Math.sin(phi) * Math.sin(theta),
             radius * Math.cos(phi)
         );
 
+        // Simple separation to avoid overlaps
+        let chosenPos = basePos;
+        for (let attempt = 0; attempt < MIN_ATTEMPTS; attempt++) {
+            const tooClose = planets.some(p => {
+                const otherSize = p.scale.x; // uniform scale
+                const minDist = Math.max((size + otherSize) * 1.5, MIN_SEPARATION_UNITS);
+                return p.position.distanceTo(chosenPos) < minDist;
+            });
+            if (!tooClose) break;
+            // Re-roll position
+            const r = BASE_RADIUS + Math.random() * RADIUS_SPREAD;
+            const t = Math.random() * Math.PI * 2;
+            const ph = Math.acos(2 * Math.random() - 1);
+            chosenPos = new THREE.Vector3(
+                r * Math.sin(ph) * Math.cos(t),
+                r * Math.sin(ph) * Math.sin(t),
+                r * Math.cos(ph)
+            );
+        }
+        mesh.position.copy(chosenPos);
+
         // === ADD ATMOSPHERE (JS CORE STYLE) ===
         // Randomize atmosphere properties
         const hasAtmosphere = Math.random() > 0.2; // 80% chance
-        if (hasAtmosphere) {
+        if (hasAtmosphere && typeof THREE.ShaderMaterial === 'function') {
             addAtmosphere(mesh, {
                 color: new THREE.Color().setHSL(Math.random(), 0.8, 0.5), // Random vivid color
                 intensity: 0.5 + Math.random() * 0.5,
@@ -77,6 +102,14 @@ export function createProceduralPlanets(count = 100) {
         const div = document.createElement('div');
         div.className = 'planet-label';
         div.textContent = name;
+        div.style.pointerEvents = 'auto';
+        div.style.cursor = 'pointer';
+        div.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!isMobile()) return;
+            if (openObjectTerminal(mesh)) return;
+            if (window.teleportTo) window.teleportTo(mesh.uuid);
+        });
         const label = new CSS2DObject(div);
         label.position.set(0, size * 1.2, 0);
         mesh.add(label);

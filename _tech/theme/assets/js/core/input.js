@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { loadControls as loadControlsShared } from '../config/controls.js';
 import { getObjectType, getDetectionRange } from './space-object-utils.js';
 import { isMobile, prefersReducedEffects } from '../utils/device.js';
+import { loadPageContent } from '../init/content-loader.js';
 import { initMobileJoysticks } from '../input/mobile-joysticks.js';
 import { startGamepadLoop } from '../input/gamepad.js';
 
@@ -93,30 +94,30 @@ approach: ${targetMeta.approach || 'standard'}</pre>
     const interceptLinksInContent = (container) => {
         const links = container.querySelectorAll('a[href]');
 
-        const openUrlInTerminal = (url) => {
+        const openUrlInTerminal = async (url) => {
             if (!window.readingHistory) window.readingHistory = [];
             const terminalContent = document.getElementById('reading-content');
             if (terminalContent) {
                 window.readingHistory.push(terminalContent.innerHTML);
             }
-            fetch(url)
-                .then(res => res.text())
-                .then(html => {
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    const content = doc.querySelector('main') || doc.querySelector('article') || doc.body;
+            try {
+                const html = await loadPageContent(url);
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const content = doc.querySelector('main') || doc.querySelector('article') || doc.body;
 
-                    const terminal = document.getElementById('reading-overlay');
-                    const terminalContent = document.getElementById('reading-content');
-                    if (terminal && terminalContent) {
-                        terminalContent.innerHTML = content.innerHTML;
-                        terminal.classList.remove('hidden');
-                        uiManager.openReadingMode();
-                        // Intercept links within newly loaded content
-                        interceptLinksInContent(terminalContent);
-                    }
-                })
-                .catch(err => console.error('Failed to load content:', err));
+                const terminal = document.getElementById('reading-overlay');
+                const terminalContentEl = document.getElementById('reading-content');
+                if (terminal && terminalContentEl) {
+                    terminalContentEl.innerHTML = content ? content.innerHTML : html;
+                    terminal.classList.remove('hidden');
+                    uiManager.openReadingMode();
+                    // Intercept links within newly loaded content
+                    interceptLinksInContent(terminalContentEl);
+                }
+            } catch (err) {
+                console.error('Failed to load content:', err);
+            }
         };
 
         links.forEach(link => {
@@ -134,17 +135,17 @@ approach: ${targetMeta.approach || 'standard'}</pre>
                     }
                 } catch (_) { /* ignore URL errors */ }
 
-                // Posts post links: open in terminal (no teleport)
-                if (href.startsWith('/posts/') || href.includes('/posts/')) {
-                    e.preventDefault();
-                    openUrlInTerminal(href);
-                    return;
-                }
+            // Posts post links: open in terminal (no teleport)
+            if (href.startsWith('/posts/') || href.includes('/posts/')) {
+                e.preventDefault();
+                openUrlInTerminal(href);
+                return;
+            }
 
-                // Try to map to a planet (site pages)
-                const allObjects = galaxyManager.getAllObjects();
-                const targetPlanet = allObjects.find(obj => {
-                    if (!obj.userData?.planetData) return false;
+            // Try to map to a planet (site pages)
+            const allObjects = galaxyManager.getAllObjects();
+            const targetPlanet = allObjects.find(obj => {
+                if (!obj.userData?.planetData) return false;
                     const planetUrl = obj.userData.planetData.url;
                     return planetUrl === href || planetUrl.endsWith(href);
                 });
@@ -158,7 +159,7 @@ approach: ${targetMeta.approach || 'standard'}</pre>
                         }));
                     }, 300);
                 } else {
-                    // Fallback: open the URL in terminal
+                    // Fallback: open the URL in terminal (IDB-backed, no navigation)
                     e.preventDefault();
                     openUrlInTerminal(href);
                 }
@@ -173,11 +174,41 @@ approach: ${targetMeta.approach || 'standard'}</pre>
         // Optional mobile twin-sticks and reduced effects
         if (isMobile()) {
             document.body.classList.add('mobile-mode');
-            const disposeJoysticks = initMobileJoysticks(document.body, shipControls, { radius: 90 });
+            const disposeJoysticks = initMobileJoysticks(document.body, shipControls, { radius: 130 });
             teardownHandlers.push(disposeJoysticks);
+            shipControls.setAnalogProfile && shipControls.setAnalogProfile('mobile');
             if (prefersReducedEffects() && uiManager?.reduceEffects) {
                 uiManager.reduceEffects();
             }
+
+            // Double-tap anywhere to full stop
+            let lastTap = { t: 0, x: 0, y: 0 };
+            window.addEventListener('touchend', (e) => {
+                // Ignore taps originating from UI overlays (joysticks, panels)
+                const target = e.target;
+                if (target.closest('.touch-zone')
+                    || target.closest('#hud-minimap')
+                    || target.closest('#reading-overlay')
+                    || target.closest('#settings-panel')
+                    || target.closest('#mobile-known-toggle')) {
+                    return;
+                }
+                const now = Date.now();
+                const touch = e.changedTouches[0];
+                if (!touch || e.touches.length > 0) return;
+                const dx = touch.clientX - lastTap.x;
+                const dy = touch.clientY - lastTap.y;
+                const dist2 = dx * dx + dy * dy;
+                if (now - lastTap.t < 250 && dist2 < 900) {
+                    shipControls.disengageAutopilot && shipControls.disengageAutopilot();
+                    shipControls.setForward(0);
+                    shipControls.setStrafe(0);
+                    shipControls.setYaw(0);
+                    shipControls.setPitch(0);
+                    shipControls.setSpeed(0);
+                }
+                lastTap = { t: now, x: touch.clientX, y: touch.clientY };
+            }, { passive: true });
         }
 
         // Optional gamepad loop (safe no-op if none connected)
@@ -222,6 +253,10 @@ approach: ${targetMeta.approach || 'standard'}</pre>
 
         // Listen for teleport requests
         window.addEventListener('teleportRequest', (e) => {
+            if (isMobile()) {
+                // Close Known panel on mobile when teleporting
+                document.body.classList.remove('mobile-known-open');
+            }
             const uuid = e.detail.uuid;
             const allObjects = galaxyManager.getAllObjects();
             const target = allObjects.find(o => o.uuid === uuid);
@@ -307,8 +342,7 @@ approach: ${targetMeta.approach || 'standard'}</pre>
             // Open terminal automatically
             const url = target.userData.planetData.url;
             if (url) {
-                fetch(url)
-                    .then(res => res.text())
+                loadPageContent(url)
                     .then(html => {
                         const parser = new DOMParser();
                         const doc = parser.parseFromString(html, 'text/html');
@@ -317,7 +351,7 @@ approach: ${targetMeta.approach || 'standard'}</pre>
                         const terminal = document.getElementById('reading-overlay');
                         const terminalContent = document.getElementById('reading-content');
                         if (terminal && terminalContent) {
-                            terminalContent.innerHTML = content.innerHTML;
+                            terminalContent.innerHTML = content ? content.innerHTML : html;
                             terminal.classList.remove('hidden');
                             uiManager.openReadingMode();
                             interceptLinksInContent(terminalContent);
@@ -343,15 +377,14 @@ approach: ${targetMeta.approach || 'standard'}</pre>
                         const terminalContent = document.getElementById('reading-content');
 
                         if (url) {
-                            fetch(url)
-                                .then(res => res.text())
+                            loadPageContent(url)
                                 .then(html => {
                                     const parser = new DOMParser();
                                     const doc = parser.parseFromString(html, 'text/html');
                                     const content = doc.querySelector('main') || doc.querySelector('article') || doc.body;
 
                                     if (terminal && terminalContent) {
-                                        terminalContent.innerHTML = content.innerHTML;
+                                        terminalContent.innerHTML = content ? content.innerHTML : html;
                                         terminal.classList.remove('hidden');
                                         uiManager.openReadingMode();
                                         interceptLinksInContent(terminalContent);
@@ -501,6 +534,18 @@ approach: ${targetMeta.approach || 'standard'}</pre>
             }
         });
 
+        // Keep fine control state in sync with pointer lock changes
+        document.addEventListener('pointerlockchange', () => {
+            if (document.pointerLockElement !== document.body && shipControls.isFineControlActive()) {
+                shipControls.setFineControl(false);
+                const fineBtn = document.getElementById('fine-control');
+                if (fineBtn) {
+                    fineBtn.classList.remove('active');
+                    fineBtn.textContent = 'Fine Pilot';
+                }
+            }
+        });
+
         // Mouse steering for fine control
         window.addEventListener('mousemove', (e) => {
             if (!shipControls.isFineControlActive()) return;
@@ -537,7 +582,7 @@ approach: ${targetMeta.approach || 'standard'}</pre>
                     terminal.classList.add('hidden');
                     uiManager.closeReadingMode();
                     // Full fallback: navigate back to root dashboard to avoid stuck state
-                    window.location.href = window.siteBase || '/';
+                    window.location.href = `${window.siteBase}/`;
                 }
             });
         }

@@ -161,6 +161,9 @@
     justify-content: center;
     transition: all 0.3s;
 }
+#settings-button.mobile-hidden {
+    display: none !important;
+}
 
 #settings-button:hover {
     background: rgba(0, 240, 255, 0.2);

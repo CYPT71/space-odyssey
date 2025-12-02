@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { CSS2DObject } from '../infrastructure/css2d-renderer.js';
 import { addAtmosphere } from '../systems/atmosphere-system.js';
-import { openObjectTerminal } from '../core/hud-utils.js';
+import { openObjectTerminal } from '../core/hud/index.js';
 import { isMobile } from '../utils/device.js';
 
 /**

@@ -1,0 +1,5 @@
+export const UI = Object.freeze({
+  MINIMAP_UPDATE_THROTTLE: 10,
+  COMPASS_UPDATE_THROTTLE: 5,
+  WARP_BOOST_COOLDOWN: 3000,
+});

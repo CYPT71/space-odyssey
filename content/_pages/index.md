@@ -21,7 +21,7 @@ Ce nœud observe et maintient les systèmes vivants : infrastructures critiques,
 ### [SIGNAL: HIRING]
 - DevSecOps / SRE / Platform Engineering
 - Remote ou hybride (Europe) | Français / English
-- Contact direct : contact@cypride.dev
+- Contact direct : contacts@cyprientaib.com
 
 ### [QUICK ACCESS]
 

@@ -226,6 +226,10 @@ body.mobile-mode #mobile-known-toggle {
 }
 
 @media (hover: none) and (pointer: coarse) {
+  .nav-actions #reader-panel-toggle {
+    padding: 5px 8px;
+    font-size: 0.8rem;
+  }
   /* Mobile: hide minimap panel by default, show toggle button */
   #hud-minimap {
     display: none;
@@ -611,10 +615,10 @@ nav a.active {
 .nav-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
   margin-left: auto;
   position: relative;
-  z-index: 3300;
+  z-index: 3400;
 }
 
 .nav-actions #settings-button {
@@ -629,6 +633,12 @@ nav a.active {
   justify-content: center;
   cursor: pointer;
   font-size: 18px;
+  order: 1;
+}
+
+#reader-mode-toggle {
+  right: 5em;
+  top: 1em;
 }
 
 .nav-actions #reader-mode-toggle {
@@ -642,13 +652,35 @@ nav a.active {
   cursor: pointer;
   transition: background 0.2s, box-shadow 0.2s;
   position: relative;
-  z-index: 3300;
+  z-index: 3400;
   line-height: 1.1;
+  box-shadow: 0 10px 24px rgba(0, 240, 255, 0.2), 0 0 12px rgba(0, 240, 255, 0.35);
+  min-width: 86px;
+  order: 2;
 }
 
 .nav-actions #reader-mode-toggle:hover {
   background: rgba(0, 240, 255, 0.22);
   box-shadow: 0 0 10px rgba(0, 240, 255, 0.35);
+}
+
+#reader-panel-toggle {
+  background: rgba(0, 240, 255, 0.1);
+  border: 1px solid rgba(0, 240, 255, 0.5);
+  color: var(--accent-cyan);
+  border-radius: 10px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  position: relative;
+  z-index: 4000;
+}
+
+#reading-overlay.content-only #reader-panel-toggle {
+  display: none;
+}
+#reader-panel-toggle:hover {
+  background: rgba(0, 240, 255, 0.2);
 }
 
 /* Scanlines Effect */
@@ -736,7 +768,7 @@ footer {
   height: 100%;
   background: radial-gradient(circle at 20% 20%, rgba(0,240,255,0.08), transparent 40%), rgba(0, 10, 20, 0.92);
   backdrop-filter: blur(15px);
-  z-index: 2100;
+  z-index: 3600;
   /* Above everything */
   display: flex;
   flex-direction: column;
@@ -948,6 +980,16 @@ body:not(.mobile-mode) #mobile-known-close {
   max-height: 70vh;
   overflow-y: auto;
   padding-right: 6px;
+  transition: max-height 0.2s ease, opacity 0.2s ease;
+}
+#reader-panel.collapsed {
+  display: none;
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+#reading-overlay.content-only #reader-panel {
+  display: none;
 }
 #reader-search {
   width: 100%;
@@ -992,8 +1034,18 @@ body:not(.mobile-mode) #mobile-known-close {
   background: rgba(0, 10, 20, 0.8);
   border: 1px solid rgba(0, 240, 255, 0.25);
   border-radius: 12px;
-  padding: 12px;
+  padding: 14px;
   box-shadow: 0 10px 22px rgba(0,0,0,0.4), 0 0 12px rgba(0,240,255,0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 170px;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.reader-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 240, 255, 0.5);
+  box-shadow: 0 14px 28px rgba(0,0,0,0.5), 0 0 16px rgba(0,240,255,0.25);
 }
 .reader-card-title {
   font-family: 'Space Grotesk', sans-serif;
@@ -1029,12 +1081,22 @@ body:not(.mobile-mode) #mobile-known-close {
   max-height: 220px;
   overflow: auto;
 }
+.reader-card-snippet {
+  color: #cfe9ff;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 
 @media (hover: none) and (pointer: coarse) {
   #reading-overlay {
     align-items: stretch;
     padding: 3.5rem 1rem 1.5rem;
     max-height: 100vh;
+    padding-top: calc(3.5rem + env(safe-area-inset-top, 0));
   }
   .reading-header {
     max-width: 100%;
@@ -1042,16 +1104,25 @@ body:not(.mobile-mode) #mobile-known-close {
     top: 0;
     z-index: 5;
     background: rgba(0, 10, 20, 0.9);
-    padding-top: 0.5rem;
+    padding-top: 0.25rem;
+  }
+  .reading-title {
+    font-size: 1.1rem;
+    margin: 0;
   }
   #reader-panel {
     max-width: 100%;
+  }
+  #reader-panel.collapsed {
+    display: none;
   }
   #reading-content {
     max-width: 100%;
     max-height: calc(100vh - 200px);
     min-height: 55vh;
     padding: 1.5rem;
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    border-radius: 12px;
   }
   nav {
     gap: 0.6rem;
@@ -1059,6 +1130,7 @@ body:not(.mobile-mode) #mobile-known-close {
   }
   .nav-actions {
     gap: 6px;
+    flex-direction: column;
   }
   .nav-actions #settings-button {
     width: 36px;
@@ -1068,6 +1140,68 @@ body:not(.mobile-mode) #mobile-known-close {
   .nav-actions #reader-mode-toggle {
     padding: 6px 10px;
     font-size: 0.85rem;
+    min-width: 72px;
+    align-self: flex-end;
+  }
+}
+
+@media (orientation: landscape) and (hover: none) and (pointer: coarse) {
+  #reading-overlay {
+    padding: 2.5rem 1rem 1rem;
+  }
+  #reading-content {
+    max-height: calc(100vh - 160px);
+    padding: 1.2rem;
+  }
+  .reading-header {
+    position: sticky;
+    top: 0;
+    margin-bottom: 0.4rem;
+    padding-bottom: 0.35rem;
+    border-bottom-width: 1px;
+  }
+  .reading-title {
+    font-size: 1.2rem;
+  }
+}
+
+/* Desktop reader layout readability */
+@media (min-width: 1024px) and (hover: hover) {
+  #reading-overlay {
+    align-items: center;
+    padding: 3rem 2.5rem 2rem;
+    display: grid;
+    grid-template-columns: 34% 66%;
+    grid-template-rows: auto 1fr;
+    column-gap: 20px;
+  }
+  .reading-header {
+    max-width: 100%;
+    margin-bottom: 1rem;
+    grid-column: 1 / span 2;
+  }
+  #reader-panel {
+    max-width: 100%;
+    grid-column: 1 / 2;
+    grid-row: 2;
+    max-height: 78vh;
+  }
+  #reader-cards {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+  #reading-content {
+    max-width: 100%;
+    max-height: 78vh;
+    padding: 2.2rem;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45), 0 0 18px rgba(0, 240, 255, 0.18);
+    grid-column: 2;
+    grid-row: 2;
+  }
+  #reader-panel.collapsed + #reading-content {
+    grid-column: 1 / span 2;
+  }
+  .reading-title {
+    font-size: 1.6rem;
   }
 }
 

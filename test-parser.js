@@ -1,4 +1,4 @@
-import { parseFileSystem } from './theme/assets/js/galaxy/parser.js';
+import { parseFileSystem } from './_tech/theme/assets/js/galaxy/parser.js';
 
 const mockFiles = [
     { path: '/index.md', name: 'index.md' },

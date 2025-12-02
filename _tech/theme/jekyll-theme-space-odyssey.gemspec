@@ -2,7 +2,7 @@ Gem::Specification.new do |spec|
   spec.name          = "jekyll-theme-space-odyssey"
   spec.version       = "0.1.0"
   spec.authors       = ["CYPT71"]
-  spec.email         = ["contact@cyprientaib.com"]
+  spec.email         = ["contacts@cyprientaib.com"]
   spec.summary       = "Space Odyssey terminal flight theme for Jekyll"
   spec.homepage      = "https://cypt71.github.io/space-odyssey"
   spec.license       = "MIT"

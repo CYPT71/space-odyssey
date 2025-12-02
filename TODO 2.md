@@ -1,7 +1,0 @@
-- [x] Optimize the code and use C++ where it’s needed for critical performance paths.
-- [x] Add lightweight tracing/observability hooks (performance marks + event logging) across core systems.
-- [x] Keep CI green: Jest 99% coverage and Jekyll build in GitHub Actions.
-- [x] Integrate the new C++/WASM math and parser modules into runtime hot paths (parser worker, octree distance, trails/nebula).
-- [x] add all unit test for C++ components (JS fallbacks + WASM wiring coverage).
-- [x] Document the architecture and key components in the repo wiki.
-- [x] Github Worflow error fixing the CI Run npm install Error: An error occurred trying to start process '/usr/bin/bash' with working directory '/home/runner/work/space-odyssey/space-odyssey/_tech'. No such file or directory

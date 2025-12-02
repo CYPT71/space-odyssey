@@ -3,6 +3,7 @@
  * @author CYPT71
  * @description Clean architecture entry point - coordinates all modules
  * @version 3.0.0
+ * 
  */
 
 import * as THREE from 'three';
@@ -33,11 +34,12 @@ import { createMapSystem } from './systems/map-system.js';
 // Core Modules (Refactored)
 import { createRenderingSystem } from './core/rendering.js';
 import { createPhysicsSystem } from './core/physics.js';
-import { createInputSystem } from './core/input.js';
-import { updateMinimap, updateCompass, openObjectTerminal } from './core/hud-utils.js';
+import { setupEventListeners as createInputSystem } from './core/input/index.js';
+import { updateMinimap, updateCompass, openObjectTerminal } from './core/hud/index.js';
 import { showLoading, hideLoading } from './systems/tutorial.js';
 import { createXRManager } from './xr/xr-manager.js';
 import { isMobile } from './utils/device.js';
+import { parseHtml } from './utils/html-parser.js';
 
 // ============================================================
 // INITIALIZATION
@@ -158,11 +160,10 @@ const inputSystem = createInputSystem({
     audioSystem,
     uiManager,
     galaxyManager,
-    scannerSystem
-});
+    scannerSystem,
+    loadPageContent
+})();
 
-// Setup all event listeners
-inputSystem.setupEventListeners();
 
 // Initialize Map System
 const mapSystem = createMapSystem({
@@ -418,8 +419,7 @@ window.teleportToPlanetImpl = function (planetName) {
         if (!terminal || !terminalContent) return false;
         loadPageContent(url)
             .then(html => {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
+                const doc = parseHtml(html);
                 const content = doc.querySelector('main') || doc.querySelector('article') || doc.body;
                 terminalContent.innerHTML = content ? content.innerHTML : html;
                 terminal.classList.remove('hidden');

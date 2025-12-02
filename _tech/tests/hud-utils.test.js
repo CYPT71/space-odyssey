@@ -3,7 +3,7 @@
  * @author CYPT71
  */
 
-import { updateMinimap, updateCompass } from '../theme/assets/js/core/hud-utils.js';
+import { updateMinimap, updateCompass } from '../theme/assets/js/core/hud/index.js';
 
 // Mock DOM
 document.body.innerHTML = `

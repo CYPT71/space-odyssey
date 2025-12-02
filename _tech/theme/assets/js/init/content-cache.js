@@ -17,7 +17,11 @@ export async function getPage(url) {
     return await new Promise((resolve, reject) => {
       const tx = db.transaction(STORE, 'readonly');
       const req = tx.objectStore(STORE).get(url);
-      req.onsuccess = () => resolve(req.result ? req.result.html : null);
+      req.onsuccess = () => {
+        if (!req.result) return resolve(null);
+        // Support both html (our cache) and content (seeded from Jekyll)
+        resolve(req.result.html || req.result.content || null);
+      };
       req.onerror = () => reject(req.error);
     });
   } catch (_) { return null; }

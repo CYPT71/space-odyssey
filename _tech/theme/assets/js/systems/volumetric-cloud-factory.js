@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { CSS2DObject } from '../infrastructure/css2d-renderer.js';
 import { mulAdd } from '../native/native-math.js';
-import { openObjectTerminal } from '../core/hud-utils.js';
+import { openObjectTerminal } from '../core/hud/index.js';
 import { isMobile } from '../utils/device.js';
 
 const colorCache = new Map();

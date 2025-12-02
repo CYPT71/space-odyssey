@@ -8,7 +8,7 @@ title: PROFILE MODULE
 **MATRICULE** : [DEVSECOPS-ARCHITECT] — AVAILABLE FOR HIRE
 **OPERATEUR** : CYPRIEN TAÏB
 **CLEARANCE** : LEVEL 5 (ROOT)
-**CONTACT** : contact@cypride.dev | Remote/Hybrid EU
+**CONTACT** : contacs@cyprientaib.com | Remote/Hybrid EU
 
 ## // MISSION PARAMETERS
 

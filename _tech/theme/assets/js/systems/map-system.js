@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { isMobile } from '../utils/device.js';
 import { loadPageContent } from '../init/content-loader.js';
+import { parseHtml } from '../utils/html-parser.js';
 
 /**
  * Creates the map system
@@ -160,8 +161,7 @@ export function createMapSystem(systems) {
             if (isMobile() && userData.planetData && userData.planetData.url) {
                 loadPageContent(userData.planetData.url)
                     .then(html => {
-                        const parser = new DOMParser();
-                        const doc = parser.parseFromString(html, 'text/html');
+                        const doc = parseHtml(html);
                         const content = doc.querySelector('main') || doc.querySelector('article') || doc.body;
                         const terminal = document.getElementById('reading-overlay');
                         const terminalContent = document.getElementById('reading-content');

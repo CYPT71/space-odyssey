@@ -19,7 +19,9 @@ const EXCLUDED_PATTERNS = [
     /^\.gitignore/,
     /\.scss$/,
     /\.css$/,
-    /\.js$/
+    /\.js$/,
+    /^404\.html$/,
+    /^404\.md$/
 ];
 
 /**
@@ -77,7 +79,7 @@ const makeFileClassifier = ({ includePaths, includeUrls, extensions = ['.md'], d
         if (requireUrl && !safeUrl) return false;
         if (disallow.some(pattern => pattern.test(safePath) || pattern.test(safeUrl))) return false;
         if (EXCLUDED_PATTERNS.some(pattern => pattern.test(safePath))) return false;
-
+        if (path.includes("404")) return false;
         const pathAllowed = includePaths.some(prefix => prefix.test(safePath));
         const urlAllowed = includeUrls.some(prefix => prefix.test(safeUrl));
         if (!pathAllowed && !urlAllowed) return false;

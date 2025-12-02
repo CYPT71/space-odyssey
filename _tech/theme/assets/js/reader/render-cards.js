@@ -21,6 +21,7 @@ export async function renderCards(container, entries = [], query = '', onOpen = 
   const q = (query || '').toLowerCase();
   container.innerHTML = '';
   const filtered = entries
+    .filter(p => !(p.url || '').includes('404'))
     .filter(p => !q || (p.title || '').toLowerCase().includes(q) || (p.url || '').toLowerCase().includes(q))
     .slice(0, 400);
   const grouped = filtered.reduce((acc, entry) => {
@@ -51,7 +52,6 @@ export async function renderCards(container, entries = [], query = '', onOpen = 
       card.innerHTML = `
         <div class="reader-card-head">
           <div class="reader-card-title">${entry.title || entry.name || 'Untitled'}</div>
-          <div class="reader-card-meta">${entry.url}</div>
         </div>
         <div class="reader-card-snippet">Loading preview…</div>
         <div class="reader-card-actions">
@@ -80,11 +80,11 @@ export async function renderCards(container, entries = [], query = '', onOpen = 
     container.appendChild(secEl);
   });
 
-  container.addEventListener('click', (e) => {
+  container.onclick = (e) => {
     const openBtn = e.target.closest('.reader-open');
     if (openBtn) {
       e.preventDefault();
       onOpen(openBtn.dataset.url);
     }
-  });
+  };
 }

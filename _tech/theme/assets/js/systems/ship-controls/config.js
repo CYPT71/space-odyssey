@@ -1,0 +1,28 @@
+export const WARP_SPEEDS = {
+  0: 500,
+  1: 2000,
+  2: 8000,
+  3: 27000,
+  4: 64000,
+  5: 125000,
+  20: 5000000,
+};
+
+export const ROTATION_CONFIG = {
+  ACCELERATION: 0.0018,
+  DECAY: 0.9,
+  MAX_BANK_ANGLE: Math.PI / 2.4,
+  BANK_SPEED: 0.1,
+  YAW_BANK_FACTOR: 15,
+  STRAFE_BANK_FACTOR: 0.5,
+  INPUT_SCALE: 6e-6,
+  ROLL_FROM_STRAFE: 1.2,
+  ROLL_GAIN: 2.0,
+};
+
+export const MOVEMENT_CONFIG = {
+  STRAFE_MULTIPLIER: 2.0,
+  VERTICAL_MULTIPLIER: 2.0,
+};
+
+export const WARP_DEBOUNCE_MS = 200;

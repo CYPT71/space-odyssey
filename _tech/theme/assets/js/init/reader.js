@@ -6,6 +6,7 @@ let overlay, contentEl, searchEl, cardsEl, panel;
 let renderListRef = null;
 let openedFromReaderButton = false;
 
+
 let loadContent;
 
 const openOverlay = () => {
@@ -66,14 +67,12 @@ export async function initReader(providedCfg = null) {
     }
     if (panel) panel.classList.remove('collapsed');
     overlay?.classList.remove('content-only');
-    isContentView = false;
     renderCards(cardsEl, cfg.fileSystem || [], searchEl?.value || '', (url) => {
       openOverlay();
       if (panel && window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches) {
         panel.classList.add('collapsed');
       }
       if (contentEl) contentEl.style.display = 'block';
-      isContentView = true;
       loadContent(url);
     });
   };
@@ -90,7 +89,6 @@ export async function initReader(providedCfg = null) {
   });
   closeBtn?.addEventListener('click', (e) => {
     e.preventDefault();
-    isContentView = false;
     if (openedFromReaderButton) {
       // If the session was started via the Reader button, bounce back to the library list
       renderList();
@@ -128,7 +126,6 @@ export async function initReader(providedCfg = null) {
 export const loadIntoReader = (url) => {
   if (!overlay) return;
   openOverlay();
-  isContentView = true;
   overlay.classList.add('content-only');
   if (panel && window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches) {
     panel.classList.add('collapsed');

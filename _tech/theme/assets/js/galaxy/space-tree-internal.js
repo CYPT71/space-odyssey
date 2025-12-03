@@ -247,7 +247,7 @@ const addToHierarchy = (node, pathParts, file, nodeProps) => {
     addToHierarchy(childNode, pathParts.slice(1), file, nodeProps);
 };
 
-const noop = () => {};
+const noop = () => { };
 
 /**
  * Parses file system into galaxy hierarchy

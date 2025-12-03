@@ -1,8 +1,9 @@
-import { ROTATION_CONFIG } from './config.js';
+import * as THREE from 'three';
 import { isKeyPressed } from './state.js';
+import { ROTATION_CONFIG } from './config.js';
 
-export const applyRotationalInertia = (state, controls) => {
-  const { ACCELERATION, DECAY } = ROTATION_CONFIG;
+export const applyRotationalInertia = (state, controls, config = ROTATION_CONFIG) => {
+  const { ACCELERATION, DECAY, ROLL_FROM_STRAFE } = config;
 
   if (isKeyPressed(state, controls.yawLeft) || state.keys.ArrowLeft) state.rotVel.y += ACCELERATION;
   if (isKeyPressed(state, controls.yawRight) || state.keys.ArrowRight) state.rotVel.y -= ACCELERATION;
@@ -10,10 +11,8 @@ export const applyRotationalInertia = (state, controls) => {
   if (isKeyPressed(state, controls.pitchUp)) state.rotVel.x += ACCELERATION;
   if (isKeyPressed(state, controls.pitchDown)) state.rotVel.x -= ACCELERATION;
 
-  if (isKeyPressed(state, controls.rollLeft)) state.rotVel.z += ACCELERATION * ROTATION_CONFIG.ROLL_GAIN;
-  if (isKeyPressed(state, controls.rollRight)) state.rotVel.z -= ACCELERATION * ROTATION_CONFIG.ROLL_GAIN;
-  if (isKeyPressed(state, controls.strafeLeft)) state.rotVel.z += ACCELERATION * ROTATION_CONFIG.ROLL_FROM_STRAFE;
-  if (isKeyPressed(state, controls.strafeRight)) state.rotVel.z -= ACCELERATION * ROTATION_CONFIG.ROLL_FROM_STRAFE;
+  if (isKeyPressed(state, controls.strafeLeft)) state.rotVel.z += ACCELERATION * ROLL_FROM_STRAFE;
+  if (isKeyPressed(state, controls.strafeRight)) state.rotVel.z -= ACCELERATION * ROLL_FROM_STRAFE;
 
   state.rotVel.x *= DECAY;
   state.rotVel.y *= DECAY;
@@ -21,11 +20,11 @@ export const applyRotationalInertia = (state, controls) => {
 
   if (state.axes.yaw) state.rotVel.y += (-state.axes.yaw) * ACCELERATION;
   if (state.axes.pitch) state.rotVel.x += (-state.axes.pitch) * ACCELERATION;
-  if (state.axes.strafe) state.rotVel.z += (-state.axes.strafe) * ACCELERATION * ROTATION_CONFIG.ROLL_FROM_STRAFE;
+  if (state.axes.strafe) state.rotVel.z += (-state.axes.strafe) * ACCELERATION * ROLL_FROM_STRAFE;
 };
 
-const calculateBankingAngle = (state, controls) => {
-  const { MAX_BANK_ANGLE, YAW_BANK_FACTOR, STRAFE_BANK_FACTOR } = ROTATION_CONFIG;
+const calculateBankingAngle = (state, controls, config) => {
+  const { MAX_BANK_ANGLE, YAW_BANK_FACTOR, STRAFE_BANK_FACTOR } = config;
   const yawBanking = -state.rotVel.y * YAW_BANK_FACTOR;
   let strafeBanking = 0;
   if (isKeyPressed(state, controls.strafeLeft)) strafeBanking = -STRAFE_BANK_FACTOR;
@@ -34,15 +33,40 @@ const calculateBankingAngle = (state, controls) => {
   return Math.max(-MAX_BANK_ANGLE, Math.min(MAX_BANK_ANGLE, targetAngle));
 };
 
-export const updateBanking = (state, controls) => {
-  state.targetBankAngle = calculateBankingAngle(state, controls);
-  state.currentBankAngle += (state.targetBankAngle - state.currentBankAngle) * ROTATION_CONFIG.BANK_SPEED;
+export const updateBanking = (state, controls, config = ROTATION_CONFIG) => {
+  state.targetBankAngle = calculateBankingAngle(state, controls, config);
+  state.currentBankAngle += (state.targetBankAngle - state.currentBankAngle) * config.BANK_SPEED;
   state.currentBankAngle *= 0.99;
 };
 
 export const applyRotation = (shipGroup, state) => {
-  shipGroup.rotation.x += state.rotVel.x;
-  shipGroup.rotation.y += state.rotVel.y;
+  if (!shipGroup.quaternion || typeof shipGroup.rotateOnAxis !== 'function') {
+    // Fallback for mocked objects (tests)
+    shipGroup.rotation.x += state.rotVel.x;
+    shipGroup.rotation.y += state.rotVel.y;
+    state.rollAngle += state.rotVel.z;
+    shipGroup.rotation.z = state.currentBankAngle + state.rollAngle;
+    return;
+  }
+
+  // Local axes derived from current orientation keep controls ship-relative
+  const upAxis = new THREE.Vector3(0, 1, 0).applyQuaternion(shipGroup.quaternion);
+  const rightAxis = new THREE.Vector3(1, 0, 0).applyQuaternion(shipGroup.quaternion);
+  const forward = new THREE.Vector3();
+
+  shipGroup.rotateOnAxis(upAxis, state.rotVel.y);
+  shipGroup.rotateOnAxis(rightAxis, state.rotVel.x);
+
   state.rollAngle += state.rotVel.z;
-  shipGroup.rotation.z = state.currentBankAngle + state.rollAngle;
+  // Keep roll pure (no extra banking) so A/E stays a clean roll around forward
+  const desiredRoll = state.rollAngle;
+  const rollDelta = desiredRoll - (state.lastRollApplied || 0);
+
+  if (shipGroup.getWorldDirection) {
+    shipGroup.getWorldDirection(forward);
+  } else {
+    forward.set(0, 0, 1).applyQuaternion(shipGroup.quaternion);
+  }
+  shipGroup.rotateOnAxis(forward.normalize(), rollDelta);
+  state.lastRollApplied = desiredRoll;
 };

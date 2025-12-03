@@ -6,11 +6,12 @@ import { createMovementHandlers } from './movement.js';
 import { updateAutopilot } from './autopilot.js';
 import { applyGravityForces } from './gravity.js';
 import { WARP_SPEEDS, ROTATION_CONFIG } from './config.js';
-
-import { PHYSICS } from '../../config/constants.js';
+import { PHYSICS as DEFAULT_PHYSICS } from '../../config/constants.js';
 
 export const createShipControls = (shipGroup, deps = {}) => {
-  const physicsConfig = deps.physics || PHYSICS;
+  const physicsConfig = deps.physics || deps.physicsConfig || DEFAULT_PHYSICS;
+  const rotationConfig = deps.rotationConfig || ROTATION_CONFIG;
+  const shipAnimations = deps.applyAnimations || applyShipAnimations;
   let controls = loadControlMappings();
   const state = createShipState();
   let analogProfile = 'default';
@@ -74,8 +75,8 @@ export const createShipControls = (shipGroup, deps = {}) => {
       }
 
       applyForwardMovement(shipGroup, state);
-      applyRotationalInertia(state, controls);
-      updateBanking(state, controls);
+      applyRotationalInertia(state, controls, rotationConfig);
+      updateBanking(state, controls, rotationConfig);
       applyRotation(shipGroup, state);
       applyStrafeMovement(shipGroup, state, controls);
       applyVerticalMovement(shipGroup, state, controls);
@@ -90,7 +91,7 @@ export const createShipControls = (shipGroup, deps = {}) => {
       }
     }
 
-    applyShipAnimations(shipGroup, state);
+    shipAnimations(shipGroup, state);
     const engines = shipGroup.userData?.impulseEngines || [];
     const speedRatio = engineIntensityFromSpeed(state.speed);
     engines.forEach(({ mesh, light }) => {

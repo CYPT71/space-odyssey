@@ -11,6 +11,7 @@ export const createShipState = () => ({
   rollAngle: 0,
   targetBankAngle: 0,
   currentBankAngle: 0,
+  lastRollApplied: 0,
   fineControl: false,
   mouseDelta: { x: 0, y: 0 },
   autopilot: {

@@ -17,11 +17,23 @@ const makeFileClassifier = ({ includePaths, includeUrls, extensions = ['.md'], d
     };
 };
 
+const stripPrefix = (raw, prefix) => {
+    if (prefix instanceof RegExp) {
+        return raw.replace(prefix, '');
+    }
+
+    if (raw.startsWith(prefix)) {
+        return raw.slice(prefix.length);
+    }
+
+    return raw;
+};
+
 const makePartsParser = ({ prefixes, defaultFirstSegment }) => (file) => {
     let raw = (file.url && typeof file.url === 'string') ? file.url : (file.path || '');
 
     prefixes.forEach(prefix => {
-        raw = raw.replace(new RegExp(`^${prefix}`), '');
+        raw = stripPrefix(raw, prefix);
     });
 
     raw = raw.replace(/^\//, '')

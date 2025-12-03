@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { initScene } from '../infrastructure/scene-setup.js';
 import { createShip } from '../entities/ship-model.js';
 import { createProceduralPlanets } from '../entities/procedural-planets.js';
-import { createShipControls } from '../systems/ship-controls.js';
+import { createShipControls } from '../inputs/ship-controls.js';
 import { loadPageContent } from '../init/content-loader.js';
 import { createAudioSystem } from '../systems/audio.js';
 import { ParticleSystem } from '../systems/particles.js';

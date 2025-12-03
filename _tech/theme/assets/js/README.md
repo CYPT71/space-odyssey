@@ -13,6 +13,10 @@ theme/assets/js/
 │   ├── reactive.js      # Proxy-based reactive state
 │   └── validator.js     # Pure validation functions
 │
+├── inputs/              # Input orchestration & device handling
+│   ├── ship-controls.js # Ship-specific control factory
+│   └── ship/            # Control state, movement, autopilot, warp
+│
 ├── utils/               # Utility Functions
 │   ├── logger.js        # Functional logging system
 │   ├── math.js          # Mathematical utilities
@@ -25,7 +29,6 @@ theme/assets/js/
 │   └── navigation.js    # Navigation system + breadcrumb
 │
 ├── systems/             # Game Systems
-│   ├── ship-controls.js # Ship input & physics
 │   ├── audio.js         # Sound system (retro arcade)
 │   ├── particles.js     # Particle effects (stars, trails)
 │   ├── ui.js            # HUD & UI management
@@ -86,6 +89,9 @@ Parses Jekyll file system into galaxy hierarchy.
 - Filters technical files
 - Creates tree structure
 - Generates unique colors
+
+### inputs/ship-controls.js
+Ship-specific control factory that wires state, movement, rotation, warp, and autopilot modules while keeping input concerns out of rendering systems.
 
 ### systems/galaxy-manager.js
 Main galaxy system orchestrator.

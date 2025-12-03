@@ -3,7 +3,7 @@
  * @author CYPT71
  */
 
-import { createShipControls } from '../theme/assets/js/systems/ship-controls.js';
+import { createShipControls } from '../theme/assets/js/inputs/ship-controls.js';
 
 // Mock THREE.js Object3D
 class MockShipGroup {

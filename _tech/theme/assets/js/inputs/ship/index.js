@@ -1,4 +1,4 @@
-import { applyShipAnimations } from '../animations.js';
+import { applyShipAnimations } from '../../systems/animations.js';
 import { loadControlMappings, createShipState, resetAutopilotSpeed, clampAxis, engineIntensityFromSpeed, isKeyPressed } from './state.js';
 import { changeWarpLevel, calculateSpeed, activateWarpBoost } from './warp.js';
 import { applyRotationalInertia, updateBanking, applyRotation } from './rotation.js';

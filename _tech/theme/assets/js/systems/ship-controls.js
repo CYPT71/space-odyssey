@@ -1,1 +1,1 @@
-export { createShipControls } from './ship-controls/index.js';
+export { createShipControls } from '../inputs/ship-controls.js';

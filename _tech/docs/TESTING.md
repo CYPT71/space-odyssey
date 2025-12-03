@@ -20,6 +20,7 @@
 - Tooling: custom profiler hooks + Jest to assert ceiling values where feasible.
 
 ## Commands
+- Run all commands from the `_tech` directory so the Jest configuration resolves the mocks and assets correctly.
 - `npm test` — unit/integration.
 - `npm run test:e2e` — Playwright smoke.
 - `node _tech/tests/parser-structure.test.js` — parser structure smoke test.

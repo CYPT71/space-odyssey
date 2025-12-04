@@ -5,126 +5,12 @@
  */
 import { startMark, endMark } from '../core/profiler.js';
 
-/**
- * Patterns to exclude technical files
- */
-const EXCLUDED_PATTERNS = [
-    /^theme\//,
-    /^_site\//,
-    /^\.git\//,
-    /^\.gemini\//,
-    /^node_modules\//,
-    /^Gemfile/,
-    /^_config\.yml/,
-    /^\.gitignore/,
-    /\.scss$/,
-    /\.css$/,
-    /\.js$/,
-    /^404\.html$/,
-    /^404\.md$/
-];
 
-/**
- * Shared structure properties for the hierarchy nodes. Switching between
- * galaxy and nebula behaviour is only a matter of swapping this config.
- */
-const HIERARCHY_NODE_PROPS = Object.freeze({
-    galaxy: {
-        childKey: 'subGalaxies',
-        leafKey: 'files',
-        typeFlag: 'isGalaxy',
-        isGalaxy: true,
-        spaceType: 'galaxy'
-    },
-    nebula: {
-        childKey: 'nebulae',
-        leafKey: 'posts',
-        typeFlag: 'isNebula',
-        isGalaxy: false,
-        spaceType: 'nebula'
-    }
-});
 
-const RUNTIME_BASE = (typeof window !== 'undefined' && window.siteBase)
-    ? (window.siteBase.replace(/\/+$/, '') || '')
-    : '';
-const BASE_URL = RUNTIME_BASE;
-const BASE_SLUG = BASE_URL.replace(/^\/+|\/+$/g, '');
-const stripBase = (val = '') => {
-    if (!BASE_URL) return val;
-    return val.startsWith(BASE_URL) ? (val.slice(BASE_URL.length) || '/') : val;
-};
 
-const normalizeInput = (path, url) => {
-    const safePath = path || '';
-    const safeUrl = stripBase(url || '');
-    return { path: safePath, url: safeUrl };
-};
 
-/**
- * Creates a classifier that decides whether a file belongs to a collection and
- * keeps a consistent exclusion strategy.
- *
- * @param {Object} options - Predicate configuration
- * @param {Array<RegExp>} options.includePaths - Path prefixes that qualify
- * @param {Array<RegExp>} options.includeUrls - URL prefixes that qualify
- * @param {Array<string>} [options.extensions] - Required file extensions (paths)
- * @param {Array<RegExp>} [options.disallow] - Extra patterns that should reject
- * @param {boolean} [options.requireUrl] - Whether a valid URL is mandatory
- * @returns {(path: string, url: string) => boolean}
- */
-const makeFileClassifier = ({ includePaths, includeUrls, extensions = ['.md'], disallow = [], requireUrl = false }) => {
-    return (path, url) => {
-        const { path: safePath, url: safeUrl } = normalizeInput(path, url);
-        if (requireUrl && !safeUrl) return false;
-        if (disallow.some(pattern => pattern.test(safePath) || pattern.test(safeUrl))) return false;
-        if (EXCLUDED_PATTERNS.some(pattern => pattern.test(safePath))) return false;
-        if (path.includes("404")) return false;
-        const pathAllowed = includePaths.some(prefix => prefix.test(safePath));
-        const urlAllowed = includeUrls.some(prefix => prefix.test(safeUrl));
-        if (!pathAllowed && !urlAllowed) return false;
 
-        if (extensions.length > 0 && !extensions.some(ext => safePath.endsWith(ext))) return false;
 
-        return true;
-    };
-};
-
-/**
- * Checks if a file should be included as content
- * ONLY files in / can create galaxies
- * @param {string} path - File path
- * @returns {boolean} True if content file in /
- */
-export const isContentFile = makeFileClassifier({
-    includePaths: [/^\//, /^content\/_pages\//, /^_pages\//],
-    includeUrls: [/^\/(?!posts\/)/], // exclude /posts/ urls from pages
-    disallow: [
-        /^\/posts\//,
-        /^_posts\//,
-        /^content\/_posts\//,
-        // Posts often look like /devops/2024-11-22-slug
-        /^\/[^/]+\/\d{4}-\d{2}-\d{2}-/
-    ],
-    extensions: ['.md']
-});
-
-/**
- * Checks if a file is a posts post
- * ONLY files in /posts/ create gas clouds
- * @param {string} path - File path
- * @returns {boolean} True if posts post in /posts/
- */
-export const isPostsPost = makeFileClassifier({
-    includePaths: [/^\/posts\//, /^content\/_posts\//, /^_posts\//],
-    includeUrls: [
-        /^\/posts\//,
-        // Accept date-slug style at root (e.g. /devops/2024-11-22-foo)
-        /^\/[^/]+\/\d{4}-\d{2}-\d{2}-/
-    ],
-    extensions: ['.md'],
-    requireUrl: false
-});
 
 /**
  * Removes standard prefixes/affixes from a path and optionally seeds a default
@@ -454,57 +340,9 @@ export const parseFileSystem = (files) => {
     return tree;
 };
 
-/**
- * Generates unique color for galaxy based on name
- * @param {string} name - Galaxy name
- * @returns {number} Color hex
- */
-export const getGalaxyColor = (name) => {
-    // Simple hash function
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-        hash = ((hash << 5) - hash) + name.charCodeAt(i);
-        hash = hash & hash;
-    }
 
-    // Convert to hue (0-360)
-    const hue = Math.abs(hash % 360);
 
-    // HSL to RGB conversion (saturation 70%, lightness 60%)
-    const s = 0.7;
-    const l = 0.6;
 
-    const c = (1 - Math.abs(2 * l - 1)) * s;
-    const x = c * (1 - Math.abs((hue / 60) % 2 - 1));
-    const m = l - c / 2;
-
-    let r, g, b;
-    if (hue < 60) { r = c; g = x; b = 0; }
-    else if (hue < 120) { r = x; g = c; b = 0; }
-    else if (hue < 180) { r = 0; g = c; b = x; }
-    else if (hue < 240) { r = 0; g = x; b = c; }
-    else if (hue < 300) { r = x; g = 0; b = c; }
-    else { r = c; g = 0; b = x; }
-
-    const toHex = (val) => Math.round((val + m) * 255);
-
-    return (toHex(r) << 16) | (toHex(g) << 8) | toHex(b);
-};
-
-/**
- * Counts total planets in galaxy (including sub-galaxies)
- * @param {Object} galaxy - Galaxy object
- * @returns {number} Total planet count
- */
-export const countPlanets = (galaxy) => {
-    let count = galaxy.files.length;
-
-    Object.values(galaxy.subGalaxies).forEach(subGalaxy => {
-        count += countPlanets(subGalaxy);
-    });
-
-    return count;
-};
 
 // Preserve legacy export name expected by WASM wrapper
 export const parseSpaceTree = parseFileSystem;

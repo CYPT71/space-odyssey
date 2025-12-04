@@ -1,0 +1,37 @@
+---
+---
+{
+  "siteBase": "{{ '/' | relative_url }}",
+  "fileSystem": [
+    {% assign content_pages = site.static_files | where_exp: 'f', 'f.path contains "content/_pages/"' | where_exp: 'f', 'f.extname == ".md"' %}
+    {% assign has_posts = site.posts | size %}
+    {% assign has_content_pages = content_pages | size %}
+    {% for page in site.pages %}
+    {
+      "title": "{{ page.title | default: page.name | escape }}",
+      "url": "{{ page.url | relative_url }}",
+      "name": "{{ page.name | escape }}",
+      "path": "{{ page.path | escape }}",
+      "dir": "{{ page.dir | escape }}"
+    }{% unless forloop.last and has_posts == 0 and has_content_pages == 0 %},{% endunless %}
+    {% endfor %}
+    {% for post in site.posts %}
+    {
+      "title": "{{ post.title | default: post.name | escape }}",
+      "url": "{{ post.url | relative_url }}",
+      "name": "{{ post.name | escape }}",
+      "path": "{{ post.path | escape }}",
+      "dir": "{{ post.dir | escape }}"
+    }{% unless forloop.last and has_content_pages == 0 %},{% endunless %}
+    {% endfor %}
+    {% for f in content_pages %}
+    {
+      "title": "{{ f.name | split: '.' | first | escape }}",
+      "url": "{{ f.path | replace: 'content/_pages', '' | replace: '.md', '' | relative_url }}",
+      "name": "{{ f.name | escape }}",
+      "path": "{{ f.path | remove_first: '/' | escape }}",
+      "dir": "{{ f.dir | escape }}"
+    }{% unless forloop.last %},{% endunless %}
+    {% endfor %}
+  ]
+}

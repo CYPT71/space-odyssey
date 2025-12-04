@@ -1,11 +1,11 @@
 import { bootstrapCore } from './space-scene/core-setup.js';
 import { initializeGalaxy } from './space-scene/galaxy-init.js';
 import { attachMobileControls } from './space-scene/mobile-ui.js';
-import { createXRHooks } from './space-scene/xr-hooks.js';
+import { setupXRLoop } from './space-scene/xr-loop.js';
 import { createMainLoop } from './space-scene/loop.js';
 import { attachLegacyTeleport } from './space-scene/teleport-legacy.js';
-import { createXRManager } from './xr/xr-manager.js';
 import { openObjectTerminal } from './core/hud/index.js';
+import { attachWarpBoost } from './space-scene/warp-boost.js';
 
 const core = bootstrapCore();
 const {
@@ -45,15 +45,7 @@ initializeGalaxy({
 // CORE SYSTEMS INITIALIZATION
 // ============================================================
 
-// Initialize Scanner
-// Warp boost integration
-const originalActivateBoost = uiManager.activateWarpBoost.bind(uiManager);
-uiManager.activateWarpBoost = function () {
-    const shouldBoost = originalActivateBoost();
-    if (shouldBoost) {
-        shipControls.activateWarpBoost();
-    }
-};
+attachWarpBoost({ uiManager, shipControls });
 
 // ============================================================
 // MAIN ANIMATION LOOP
@@ -75,23 +67,13 @@ if (mobileMode) {
 }
 
 // XR manager (progressive enhancement)
-const xrManager = createXRManager({
-    renderer,
-    onXRFrame: () => {
-        loop.markXRActive(true);
-        loop.tick();
-    }
-});
-
-const xrHooks = createXRHooks({
+const { xrManager } = setupXRLoop({
     renderer,
     renderingSystem,
     clock,
-    xrManager,
     mobileMode,
-    markXRActive: loop.markXRActive
+    loop
 });
-xrHooks.attachEasterEggButton(loop.tick);
 
 // Start the animation loop (non-XR)
 loop.animate();
